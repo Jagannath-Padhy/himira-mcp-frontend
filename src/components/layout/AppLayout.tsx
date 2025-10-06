@@ -19,7 +19,7 @@ export default function AppLayout({
   return (
     <Box display="flex" height="100vh" width="100vw">
       {/* Desktop Sidebar */}
-      <Box
+      {/* <Box
         component="aside"
         sx={{
           width: 280,
@@ -31,7 +31,7 @@ export default function AppLayout({
         }}
       >
         {sidebar}
-      </Box>
+      </Box> */}
 
       {/* Mobile Sidebar Drawer */}
       <Drawer

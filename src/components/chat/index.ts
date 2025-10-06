@@ -1,3 +1,8 @@
 export { default as MessageBubble } from './MessageBubble';
 export { default as MessageInput } from './MessageInput';
 export { default as ProductCard } from './ProductCard';
+export { default as CartInterface } from './CartInterface';
+export { default as CheckoutInterface } from './CheckoutInterface';
+export { default as ErrorInterface } from './ErrorInterface';
+export { default as OrderConfirmation } from './OrderConfirmation';
+export { default as SuccessMessage } from './SuccessMessage';

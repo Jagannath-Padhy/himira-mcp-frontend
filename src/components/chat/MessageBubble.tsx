@@ -18,8 +18,8 @@ export default function MessageBubble({ type, content }: MessageBubbleProps) {
           px: 2,
           py: 1,
           borderRadius: 2,
-          bgcolor: theme.palette.primary.main,
-          color: theme.palette.common.white,
+          bgcolor: isUser ? theme.palette.primary.main : theme.palette.grey[100],
+          color: isUser ? theme.palette.common.white : theme.palette.text.primary,
         }}
       >
         <Typography variant="body1">{content}</Typography>

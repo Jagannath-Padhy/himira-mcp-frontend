@@ -1,17 +1,18 @@
-import { IconButton, Paper } from '@mui/material';
+import { IconButton, Paper, CircularProgress } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
 import { useState } from 'react';
 import { TextField } from '@components';
 
 type MessageInputProps = {
   onSend: (message: string) => void;
+  isLoading?: boolean;
 };
 
-export default function MessageInput({ onSend }: MessageInputProps) {
+export default function MessageInput({ onSend, isLoading = false }: MessageInputProps) {
   const [value, setValue] = useState('');
 
   const handleSend = () => {
-    if (!value.trim()) return;
+    if (!value.trim() || isLoading) return;
     onSend(value.trim());
     setValue('');
   };
@@ -25,6 +26,7 @@ export default function MessageInput({ onSend }: MessageInputProps) {
         size="small"
         value={value}
         onChange={(e) => setValue(e.target.value)}
+        disabled={isLoading}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
@@ -34,8 +36,12 @@ export default function MessageInput({ onSend }: MessageInputProps) {
         slotProps={{
           input: {
             endAdornment: (
-              <IconButton color="primary" onClick={handleSend} disabled={!value.trim()}>
-                <SendIcon />
+              <IconButton
+                color="primary"
+                onClick={handleSend}
+                disabled={!value.trim() || isLoading}
+              >
+                {isLoading ? <CircularProgress size={20} /> : <SendIcon />}
               </IconButton>
             ),
           },
