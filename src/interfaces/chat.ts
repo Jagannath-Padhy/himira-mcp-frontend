@@ -89,6 +89,7 @@ export type CartItem = {
   fulfillment_id: string;
   category: string;
   currency: string;
+  image_url?: string;
 };
 
 // Quote Data
@@ -188,6 +189,8 @@ export type FullData = {
 // Enhanced Chat Message Types
 export type ChatMessage =
   | { id: string; type: 'user' | 'bot'; content: string }
+  | { id: string; type: 'bot_thinking'; content: string }
+  | { id: string; type: 'bot_tool_executing'; tool: string; status: string }
   | { id: string; type: 'bot_product_list'; products: Product[] }
   | { id: string; type: 'bot_cart_view'; cartContext: CartContext }
   | { id: string; type: 'bot_checkout_stage'; quoteData: QuoteData; journeyContext: JourneyContext }
@@ -207,4 +210,157 @@ export type ChatSession = {
   id: string;
   title: string;
   messages: ChatMessage[];
+};
+
+// SSE Streaming Response Types
+export type StreamingResponse =
+  | {
+    type: 'thinking';
+    message: string;
+    timestamp?: string;
+    session_id?: string;
+  }
+  | {
+    type: 'tool_start';
+    tool: string;
+    status: string;
+    session_id?: string;
+    timestamp?: string;
+  }
+  | {
+    type: 'response';
+    content: string;
+    session_id?: string;
+    timestamp?: string;
+    complete?: boolean;
+    data?: ChatApiResponse['data'];
+    context_type?: ContextType;
+  }
+  | {
+    type: 'raw_products';
+    tool_name?: string;
+    session_id?: string;
+    raw_data?: boolean;
+    biap_specifications?: boolean;
+    timestamp?: string;
+    products: RawProduct[];
+    total_results?: number;
+    search_type?: string;
+    page?: number;
+    page_size?: number;
+  }
+  | {
+    type: 'raw_cart';
+    tool_name?: string;
+    session_id?: string;
+    raw_data?: boolean;
+    biap_specifications?: boolean;
+    timestamp?: string;
+    cart_items: RawCartItem[];
+    cart_summary: RawCartSummary;
+  };
+
+// Raw Product Type from BIAP API
+export type RawProduct = {
+  item_details: {
+    id: string;
+    descriptor: {
+      name: string;
+      short_desc?: string;
+      long_desc?: string;
+      images?: string[];
+    };
+    price: {
+      currency: string;
+      value: number;
+      maximum_value?: string;
+    };
+    category_id: string;
+    location_id: string;
+    fulfillment_id: string;
+  };
+  provider_details: {
+    id: string;
+    descriptor: {
+      name: string;
+    };
+  };
+  location_details?: {
+    id: string;
+  };
+  id: string;
+  name: string;
+  description?: string;
+  long_description?: string;
+  price: {
+    currency: string;
+    value: number;
+  };
+  currency: string;
+  images?: string[];
+  category: string;
+  provider_id: string;
+  provider_name: string;
+  provider_location: string;
+  returnable?: boolean;
+  cod_available?: boolean;
+  available?: boolean;
+};
+
+// Raw Cart Types from BIAP API
+export type RawCartItem = {
+  _id: string;
+  item_id: string;
+  id: string;
+  provider_id: string;
+  count: number;
+  item: {
+    id: string;
+    product: {
+      descriptor: {
+        name: string;
+        images?: string[];
+      };
+      price: {
+        currency: string;
+        value: number;
+      };
+      category_id: string;
+    };
+    provider: {
+      id: string;
+      descriptor: {
+        name: string;
+      };
+    };
+  };
+};
+
+export type RawCartSummary = {
+  items?: RawCartSummaryItem[];
+  total_items?: number;
+  total_value?: number;
+  is_empty?: boolean;
+};
+
+export type RawCartSummaryItem = {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+  category: string;
+  image_url?: string;
+  description?: string;
+  provider?: {
+    id: string;
+    local_id?: string;
+    locations?: string[];
+    descriptor?: {
+      name: string;
+    };
+  };
+  provider_id: string;
+  location_id: string;
+  fulfillment_id: string;
+  subtotal: number;
 };

@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { AppLayout, Sidebar, Header } from '@components';
 import ChatArea from './ChatArea';
-import { ChatMessage, ChatSession, ChatApiResponse } from '@interfaces';
-import usePost from '../../hooks/usePost';
+import { ChatMessage, ChatSession, ChatApiResponse, StreamingResponse, RawProduct, RawCartSummary, CartContext, CartItem } from '@interfaces';
+import { useChatStream } from '../../hooks';
+import { Product } from '@interfaces';
 
 const Chat = () => {
   const [chats, setChats] = useState<ChatSession[]>([
@@ -13,10 +14,55 @@ const Chat = () => {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [deviceId, setDeviceId] = useState<string | null>(null);
   const [cartState, setCartState] = useState({ itemCount: 0, total: 0 });
 
   const hasInitialized = useRef(false);
+
+  // Helper function to transform raw products to Product format
+  const transformRawProduct = (rawProduct: RawProduct): Product => {
+    return {
+      id: rawProduct.id,
+      name: rawProduct.name || rawProduct.item_details.descriptor.name,
+      description: rawProduct.description || rawProduct.item_details.descriptor.short_desc || rawProduct.item_details.descriptor.long_desc || '',
+      price: rawProduct.price?.value || rawProduct.item_details.price.value,
+      category: rawProduct.category || rawProduct.item_details.category_id,
+      provider: {
+        id: rawProduct.provider_id || rawProduct.provider_details.id,
+        name: rawProduct.provider_name || rawProduct.provider_details.descriptor.name,
+        delivery_available: true, // Assuming delivery is available
+      },
+      images: rawProduct.images || rawProduct.item_details.descriptor.images || [],
+    };
+  };
+
+  // Helper function to transform raw cart summary to CartContext format
+  const transformRawCartSummary = (rawCartSummary: RawCartSummary): CartContext => {
+    // Handle case where items might be undefined or empty
+    const cartItems: CartItem[] = (rawCartSummary.items || []).map((item) => ({
+      id: item.id,
+      local_id: item.id,
+      name: item.name,
+      quantity: item.quantity,
+      price: item.price,
+      total_price: item.subtotal,
+      provider_id: item.provider_id,
+      // Extract provider name from provider object or use provider_id as fallback
+      provider_name: item.provider?.descriptor?.name || item.provider?.id?.split('_').pop() || 'Unknown Provider',
+      location_id: item.location_id,
+      fulfillment_id: item.fulfillment_id,
+      category: item.category,
+      currency: 'INR',
+      image_url: item.image_url || '',
+    }));
+
+    return {
+      items: cartItems,
+      total_items: rawCartSummary.total_items || 0,
+      total_value: rawCartSummary.total_value || 0,
+      is_empty: rawCartSummary.is_empty !== undefined ? rawCartSummary.is_empty : cartItems.length === 0,
+      ready_for_checkout: !rawCartSummary.is_empty && cartItems.length > 0,
+    };
+  };
 
   // Helper function to create messages based on API response
   const createMessagesFromResponse = (responseData: ChatApiResponse): ChatMessage[] => {
@@ -115,56 +161,271 @@ const Chat = () => {
     return messages;
   };
 
-  const { mutate: sendChatMessage } = usePost({
-    onSuccess: (response: unknown) => {
-      setIsLoading(false);
-      const responseData = response as ChatApiResponse;
+  // Helper function to remove all thinking and tool executing messages
+  const removeThinkingMessages = useCallback(() => {
+    setChats((prev) =>
+      prev.map((c) => {
+        if (c.id !== activeChatId) return c;
 
-      // Update session and device IDs
-      if (responseData.session_id) {
-        setSessionId(responseData.session_id);
+        // Filter out ALL thinking and tool executing messages
+        const messagesWithoutThinking = c.messages.filter(
+          (m) => m.type !== 'bot_thinking' && m.type !== 'bot_tool_executing'
+        );
+
+        console.log('🗑️ Removing thinking/tool messages, before:', c.messages.length, 'after:', messagesWithoutThinking.length);
+
+        return {
+          ...c,
+          messages: messagesWithoutThinking,
+        };
+      }),
+    );
+  }, [activeChatId]);
+
+  const handleThinking = useCallback(
+    (message: string, session_id?: string) => {
+      // Update session ID if provided
+      if (session_id) {
+        setSessionId(session_id);
       }
 
-      if (responseData.device_id) {
-        setDeviceId(responseData.device_id);
+      console.log('💭 Thinking message:', message);
+
+      const thinkingMsg: ChatMessage = {
+        id: `thinking${Date.now()}`,
+        type: 'bot_thinking',
+        content: message,
+      };
+
+      setChats((prev) =>
+        prev.map((c) => {
+          if (c.id !== activeChatId) return c;
+
+          // Remove any existing thinking messages (but keep tool executing) and add new one
+          const messagesWithoutThinking = c.messages.filter((m) => m.type !== 'bot_thinking');
+
+          return {
+            ...c,
+            messages: [...messagesWithoutThinking, thinkingMsg]
+          };
+        }),
+      );
+    },
+    [activeChatId],
+  );
+
+  const handleToolStart = useCallback(
+    (tool: string, status: string, session_id?: string) => {
+      // Update session ID if provided
+      if (session_id) {
+        setSessionId(session_id);
+      }
+
+      console.log('🔧 Tool execution message:', tool, status);
+
+      const toolMsg: ChatMessage = {
+        id: `tool${Date.now()}`,
+        type: 'bot_tool_executing',
+        tool: tool,
+        status: status,
+      };
+
+      setChats((prev) =>
+        prev.map((c) => {
+          if (c.id !== activeChatId) return c;
+
+          // Remove any existing tool executing messages and add new one
+          const messagesWithoutToolExec = c.messages.filter((m) => m.type !== 'bot_tool_executing');
+
+          return {
+            ...c,
+            messages: [...messagesWithoutToolExec, toolMsg]
+          };
+        }),
+      );
+    },
+    [activeChatId],
+  );
+
+  const handleResponse = useCallback(
+    (response: StreamingResponse & { type: 'response' }) => {
+      console.log('🎯 handleResponse called with:', response);
+      setIsLoading(false);
+
+      // Update session ID if provided
+      if (response.session_id) {
+        setSessionId(response.session_id);
       }
 
       // Skip initialization messages from being displayed
       if (
-        responseData.response?.includes('initialized a new shopping session') ||
-        responseData.response?.includes('Session Ready')
+        response.content?.includes('initialized a new shopping session') ||
+        response.content?.includes('Session Ready')
       ) {
+        console.log('⏭️ Skipping initialization message, removing thinking messages');
+        removeThinkingMessages();
         return;
       }
 
+      // Create response data in the format expected by createMessagesFromResponse
+      const responseData: ChatApiResponse = {
+        response: response.content,
+        session_id: response.session_id || sessionId || '',
+        device_id: '',
+        timestamp: response.timestamp || new Date().toISOString(),
+        data: response.data,
+        context_type: response.context_type,
+      };
+
       // Update cart state if cart context is present
-      if (responseData.data?.cart_context) {
+      if (response.data?.cart_context) {
         setCartState({
-          itemCount: responseData.data.cart_context.total_items || 0,
-          total: responseData.data.cart_context.total_value || 0,
+          itemCount: response.data.cart_context.total_items || 0,
+          total: response.data.cart_context.total_value || 0,
         });
       }
 
-      // if responseData.data?.simple_data?.next_step is not null, then show buttons and if user click on that api will call
-
       // Create messages based on response
       const newMessages = createMessagesFromResponse(responseData);
+      console.log('📝 New messages created:', newMessages.length, newMessages);
 
-      // Add messages to chat
+      // Remove ALL thinking messages and add response messages
       setChats((prev) =>
-        prev.map((c) =>
-          c.id === activeChatId
-            ? {
-                ...c,
-                messages: [...c.messages, ...newMessages],
-              }
-            : c,
-        ),
+        prev.map((c) => {
+          if (c.id !== activeChatId) return c;
+
+          // Filter out ALL thinking and tool executing messages
+          const messagesWithoutThinking = c.messages.filter(
+            (m) => m.type !== 'bot_thinking' && m.type !== 'bot_tool_executing'
+          );
+
+          console.log('🗑️ Removing thinking messages in handleResponse, before:', c.messages.length, 'after:', messagesWithoutThinking.length);
+
+          return {
+            ...c,
+            messages: [...messagesWithoutThinking, ...newMessages],
+          };
+        }),
       );
+
+      console.log('✅ Response handled, thinking messages removed');
     },
-    onError: (error: unknown) => {
+    [activeChatId, sessionId, removeThinkingMessages],
+  );
+
+  const handleRawProducts = useCallback(
+    (response: StreamingResponse & { type: 'raw_products' }) => {
+      console.log('🛍️ handleRawProducts called with:', response);
       setIsLoading(false);
-      console.error('Chat API error:', error);
+
+      // Update session ID if provided
+      if (response.session_id) {
+        setSessionId(response.session_id);
+      }
+
+      // Transform raw products to Product format
+      const transformedProducts: Product[] = response.products.map(transformRawProduct);
+      console.log('📦 Transformed products:', transformedProducts.length);
+
+      // Create product list message
+      const productMessage: ChatMessage = {
+        id: `raw_products${Date.now()}`,
+        type: 'bot_product_list',
+        products: transformedProducts,
+      };
+
+      // Remove ALL thinking messages and add product message
+      setChats((prev) =>
+        prev.map((c) => {
+          if (c.id !== activeChatId) return c;
+
+          // Filter out ALL thinking and tool executing messages
+          const messagesWithoutThinking = c.messages.filter(
+            (m) => m.type !== 'bot_thinking' && m.type !== 'bot_tool_executing'
+          );
+
+          console.log('🗑️ Removing thinking messages in handleRawProducts, before:', c.messages.length, 'after:', messagesWithoutThinking.length);
+
+          return {
+            ...c,
+            messages: [...messagesWithoutThinking, productMessage],
+          };
+        }),
+      );
+
+      console.log('✅ Raw products handled, thinking messages removed');
+    },
+    [activeChatId, transformRawProduct],
+  );
+
+  const handleRawCart = useCallback(
+    (response: StreamingResponse & { type: 'raw_cart' }) => {
+      console.log('🛒 handleRawCart called with:', response);
+
+      // Update session ID if provided
+      if (response.session_id) {
+        setSessionId(response.session_id);
+      }
+
+      // Check if cart_summary is valid and has items
+      if (!response.cart_summary || !response.cart_summary.items || response.cart_summary.items.length === 0) {
+        console.log('⚠️ Skipping raw_cart with empty or invalid cart_summary');
+        // Just remove thinking messages without adding cart UI
+        removeThinkingMessages();
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(false);
+
+      // Transform raw cart summary to CartContext format
+      const cartContext = transformRawCartSummary(response.cart_summary);
+      console.log('🛒 Transformed cart context:', cartContext);
+
+      // Update cart state in header
+      setCartState({
+        itemCount: cartContext.total_items || 0,
+        total: cartContext.total_value || 0,
+      });
+
+      // Create cart view message
+      const cartMessage: ChatMessage = {
+        id: `raw_cart${Date.now()}`,
+        type: 'bot_cart_view',
+        cartContext: cartContext,
+      };
+
+      // Remove ALL thinking messages and add cart message
+      setChats((prev) =>
+        prev.map((c) => {
+          if (c.id !== activeChatId) return c;
+
+          // Filter out ALL thinking and tool executing messages
+          const messagesWithoutThinking = c.messages.filter(
+            (m) => m.type !== 'bot_thinking' && m.type !== 'bot_tool_executing'
+          );
+
+          console.log('🗑️ Removing thinking messages in handleRawCart, before:', c.messages.length, 'after:', messagesWithoutThinking.length);
+
+          return {
+            ...c,
+            messages: [...messagesWithoutThinking, cartMessage],
+          };
+        }),
+      );
+
+      console.log('✅ Raw cart handled, thinking messages removed');
+    },
+    [activeChatId, transformRawCartSummary, removeThinkingMessages],
+  );
+
+  const handleStreamError = useCallback(
+    (error: Error) => {
+      setIsLoading(false);
+      console.error('❌ Chat stream error:', error);
+
+      // Remove all thinking messages
+      removeThinkingMessages();
 
       // Get the current active chat to check if we should append message
       const currentChat = chats.find((c) => c.id === activeChatId);
@@ -190,6 +451,25 @@ const Chat = () => {
         );
       }
     },
+    [activeChatId, chats, removeThinkingMessages],
+  );
+
+  const handleStreamComplete = useCallback(() => {
+    console.log('🏁 handleStreamComplete called - removing ALL thinking messages');
+    setIsLoading(false);
+
+    // Always remove all thinking messages when stream completes
+    removeThinkingMessages();
+  }, [removeThinkingMessages]);
+
+  const { sendMessage: sendStreamMessage } = useChatStream({
+    onThinking: handleThinking,
+    onToolStart: handleToolStart,
+    onResponse: handleResponse,
+    onRawProducts: handleRawProducts,
+    onRawCart: handleRawCart,
+    onError: handleStreamError,
+    onComplete: handleStreamComplete,
   });
 
   // Memoize activeChat to prevent unnecessary rerenders
@@ -201,7 +481,6 @@ const Chat = () => {
   const sendMessage = useCallback(
     (msg: string, appendMessage = true) => {
       // Add user message immediately
-
       if (appendMessage) {
         const newMsg: ChatMessage = { id: `m${Date.now()}`, type: 'user', content: msg };
 
@@ -215,13 +494,10 @@ const Chat = () => {
       // Show loading state
       setIsLoading(true);
 
-      // Call /chat API
-      sendChatMessage({
-        url: '/chat',
-        payload: { message: msg, session_id: sessionId },
-      });
+      // Call streaming API
+      sendStreamMessage(msg, sessionId);
     },
-    [activeChatId, sessionId, deviceId, sendChatMessage],
+    [activeChatId, sessionId, sendStreamMessage],
   );
 
   const createChat = useCallback(() => {
@@ -255,10 +531,10 @@ const Chat = () => {
     if (!hasInitialized.current) {
       hasInitialized.current = true;
 
-      sendMessage(
-        'initialize_shopping (userId: EUSJ0ypAJJVdo3gXrUJe4uIBwDB2, deviceid: ed0bda0dd8c167a73721be5bb142dfc9)',
-        false,
-      );
+      // sendMessage(
+      //   'initialize_shopping (userId: EUSJ0ypAJJVdo3gXrUJe4uIBwDB2, deviceid: ed0bda0dd8c167a73721be5bb142dfc9)',
+      //   false,
+      // );
     }
   }, [sendMessage]); // Include sendMessage in dependencies
 

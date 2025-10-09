@@ -19,38 +19,107 @@ const ProductCard = ({ product, onSend }: ProductCardProps) => {
   const formatPrice = (price: number) => `₹${price.toFixed(2)}`;
 
   return (
-    <Card sx={{ maxWidth: 280, borderRadius: 2, height: '100%' }}>
+    <Card
+      sx={{
+        borderRadius: 2,
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        border: '1px solid',
+        borderColor: 'divider',
+      }}
+    >
       {product.images && product.images.length > 0 ? (
         <CardMedia
           component="img"
-          height="140"
           image={product.images[0]}
           alt={product.name}
-          sx={{ objectFit: 'cover' }}
+          sx={{
+            height: 320,
+            width: '100%',
+            objectFit: 'cover',
+            borderBottom: '1px solid',
+            borderColor: 'divider',
+          }}
         />
       ) : (
         <Box
-          height={140}
-          display="flex"
-          alignItems="center"
-          justifyContent="center"
-          bgcolor="grey.100"
+          sx={{
+            height: 320,
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            bgcolor: 'grey.100',
+            borderBottom: '1px solid',
+            borderColor: 'divider',
+          }}
         >
           <Typography color="text.secondary">No Image</Typography>
         </Box>
       )}
-      <CardContent>
-        <Typography variant="subtitle1" fontWeight={600} noWrap>
+
+      <CardContent
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 1.5,
+          flexGrow: 1,
+          p: 1.25,
+        }}
+      >
+        <Box
+          display="flex"
+          alignItems="center"
+          justifyContent="space-between"
+          sx={{ minHeight: 32 }}
+        >
+          <Chip
+            label={product.category}
+            size="small"
+            variant="outlined"
+            color="secondary"
+          />
+        </Box>
+        <Typography
+          variant="body1"
+          sx={{
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            lineHeight: '24px',
+          }}
+        >
           {product.name}
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            lineHeight: '20px',
+          }}
+        >
           {product.description || 'No description available'}
         </Typography>
-        <Box display="flex" alignItems="center" gap={1} mb={1}>
-          <Typography variant="h6" color="primary" fontWeight={600}>
+
+        <Box display="flex" gap={0.5}>
+          <Typography
+            variant="body1"
+            fontWeight={600}
+            sx={{
+              lineHeight: '22px',
+            }}
+          >
             {formatPrice(product.price)}
           </Typography>
-          <Chip label={product.category} size="small" variant="outlined" color="secondary" />
         </Box>
         {product.provider.name && (
           <Typography variant="caption" color="text.secondary">
@@ -58,6 +127,7 @@ const ProductCard = ({ product, onSend }: ProductCardProps) => {
           </Typography>
         )}
       </CardContent>
+
       <CardActions>
         <Button
           size="small"
