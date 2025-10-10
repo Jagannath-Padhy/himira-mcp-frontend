@@ -35,9 +35,21 @@ const Chat = () => {
         (rawProduct as any).bpp_details?.name ||
         'Unknown Provider';
 
-      const productImages = rawProduct.images ||
+      let productImages = rawProduct.images ||
         rawProduct.item_details?.descriptor?.images ||
         [];
+
+      // Handle images - they can be strings or objects with {url, type, alt_text}
+      if (Array.isArray(productImages) && productImages.length > 0) {
+        productImages = productImages.map((img: any) => {
+          if (typeof img === 'string') {
+            return img;
+          } else if (typeof img === 'object' && img.url) {
+            return img.url;
+          }
+          return '';
+        }).filter((url: string) => url && url.trim() !== '');
+      }
 
       console.log('🖼️ Product images for', rawProduct.name, ':', productImages);
 

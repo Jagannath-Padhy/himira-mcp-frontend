@@ -9,6 +9,7 @@ import {
   Box,
   Chip,
 } from '@mui/material';
+import { useState } from 'react';
 
 type ProductCardProps = {
   product: Product;
@@ -17,11 +18,15 @@ type ProductCardProps = {
 
 const ProductCard = ({ product, onSend }: ProductCardProps) => {
   const formatPrice = (price: number) => `₹${price.toFixed(2)}`;
+  const [imgSrc, setImgSrc] = useState<string>(
+    product.images && product.images.length > 0 && product.images[0].trim() !== ''
+      ? product.images[0]
+      : '/FallbackImage.jpeg'
+  );
 
-  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
-    console.error('❌ Image failed to load for product:', product.name, 'URL:', product.images?.[0]);
-    // Hide the broken image
-    e.currentTarget.style.display = 'none';
+  const handleImageError = () => {
+    console.warn('⚠️ Image failed to load for product:', product.name, 'URL:', imgSrc, '- Using fallback image');
+    setImgSrc('/FallbackImage.jpeg');
   };
 
   console.log('🎴 Rendering ProductCard:', product.name, 'Images:', product.images);
@@ -37,10 +42,10 @@ const ProductCard = ({ product, onSend }: ProductCardProps) => {
         borderColor: 'divider',
       }}
     >
-      {product.images && product.images.length > 0 ? (
+      {imgSrc ? (
         <CardMedia
           component="img"
-          image={product.images[0]}
+          image={imgSrc}
           alt={product.name}
           onError={handleImageError}
           sx={{
