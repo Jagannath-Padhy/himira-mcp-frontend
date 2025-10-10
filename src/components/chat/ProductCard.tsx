@@ -18,6 +18,14 @@ type ProductCardProps = {
 const ProductCard = ({ product, onSend }: ProductCardProps) => {
   const formatPrice = (price: number) => `₹${price.toFixed(2)}`;
 
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    console.error('❌ Image failed to load for product:', product.name, 'URL:', product.images?.[0]);
+    // Hide the broken image
+    e.currentTarget.style.display = 'none';
+  };
+
+  console.log('🎴 Rendering ProductCard:', product.name, 'Images:', product.images);
+
   return (
     <Card
       sx={{
@@ -34,6 +42,7 @@ const ProductCard = ({ product, onSend }: ProductCardProps) => {
           component="img"
           image={product.images[0]}
           alt={product.name}
+          onError={handleImageError}
           sx={{
             height: 320,
             width: '100%',

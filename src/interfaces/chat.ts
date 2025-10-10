@@ -261,47 +261,48 @@ export type StreamingResponse =
   };
 
 // Raw Product Type from BIAP API
+// Note: API returns inconsistent structures, so most fields are optional
 export type RawProduct = {
-  item_details: {
-    id: string;
-    descriptor: {
-      name: string;
+  item_details?: {
+    id?: string;
+    descriptor?: {
+      name?: string;
       short_desc?: string;
       long_desc?: string;
       images?: string[];
     };
-    price: {
-      currency: string;
+    price?: {
+      currency?: string;
       value: number;
       maximum_value?: string;
     };
-    category_id: string;
-    location_id: string;
-    fulfillment_id: string;
+    category_id?: string;
+    location_id?: string;
+    fulfillment_id?: string;
   };
-  provider_details: {
+  provider_details?: {
     id: string;
-    descriptor: {
-      name: string;
+    descriptor?: {
+      name?: string;
     };
   };
   location_details?: {
     id: string;
   };
   id: string;
-  name: string;
+  name?: string;
   description?: string;
   long_description?: string;
-  price: {
-    currency: string;
+  price?: {
+    currency?: string;
     value: number;
   };
-  currency: string;
+  currency?: string;
   images?: string[];
-  category: string;
-  provider_id: string;
-  provider_name: string;
-  provider_location: string;
+  category?: string;
+  provider_id?: string;
+  provider_name?: string;
+  provider_location?: string;
   returnable?: boolean;
   cod_available?: boolean;
   available?: boolean;

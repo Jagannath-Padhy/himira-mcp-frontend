@@ -19,24 +19,82 @@ const Chat = () => {
   const hasInitialized = useRef(false);
 
   // Helper function to transform raw products to Product format
-  const transformRawProduct = (rawProduct: RawProduct): Product => {
-    return {
-      id: rawProduct.id,
-      name: rawProduct.name || rawProduct.item_details.descriptor.name,
-      description: rawProduct.description || rawProduct.item_details.descriptor.short_desc || rawProduct.item_details.descriptor.long_desc || '',
-      price: rawProduct.price?.value || rawProduct.item_details.price.value,
-      category: rawProduct.category || rawProduct.item_details.category_id,
-      provider: {
-        id: rawProduct.provider_id || rawProduct.provider_details.id,
-        name: rawProduct.provider_name || rawProduct.provider_details.descriptor.name,
-        delivery_available: true, // Assuming delivery is available
-      },
-      images: rawProduct.images || rawProduct.item_details.descriptor.images || [],
-    };
-  };
+  const transformRawProduct = useCallback((rawProduct: RawProduct): Product => {
+    console.log('🔄 Transforming raw product:', rawProduct);
+
+    try {
+      // Handle inconsistent API structure - some products have different field names
+      const providerId = rawProduct.provider_id ||
+        rawProduct.provider_details?.id ||
+        (rawProduct as any).provider?.id ||
+        'unknown';
+
+      const providerName = rawProduct.provider_name ||
+        rawProduct.provider_details?.descriptor?.name ||
+        (rawProduct as any).provider?.descriptor?.name ||
+        (rawProduct as any).bpp_details?.name ||
+        'Unknown Provider';
+
+      const productImages = rawProduct.images ||
+        rawProduct.item_details?.descriptor?.images ||
+        [];
+
+      console.log('🖼️ Product images for', rawProduct.name, ':', productImages);
+
+      // Handle category - it can be a string or an object with {id, name, description, parent_id, level}
+      let categoryString = 'Uncategorized';
+      if (rawProduct.category) {
+        if (typeof rawProduct.category === 'string') {
+          categoryString = rawProduct.category;
+        } else if (typeof rawProduct.category === 'object' && (rawProduct.category as any).name) {
+          // Category is an object, extract the name
+          categoryString = (rawProduct.category as any).name || (rawProduct.category as any).id || 'Uncategorized';
+        }
+      } else if (rawProduct.item_details?.category_id) {
+        categoryString = rawProduct.item_details.category_id;
+      }
+
+      const transformed = {
+        id: rawProduct.id,
+        name: rawProduct.name || rawProduct.item_details?.descriptor?.name || 'Unnamed Product',
+        description: rawProduct.description ||
+          rawProduct.long_description ||
+          rawProduct.item_details?.descriptor?.short_desc ||
+          rawProduct.item_details?.descriptor?.long_desc ||
+          '',
+        price: rawProduct.price?.value || rawProduct.item_details?.price?.value || 0,
+        category: categoryString,
+        provider: {
+          id: providerId,
+          name: providerName,
+          delivery_available: true,
+        },
+        images: productImages,
+      };
+
+      console.log('✅ Transformed product:', transformed);
+      return transformed;
+    } catch (error) {
+      console.error('❌ Error transforming product:', error, rawProduct);
+      // Return a fallback product to prevent the entire list from failing
+      return {
+        id: rawProduct.id || 'unknown',
+        name: 'Error loading product',
+        description: 'This product could not be loaded',
+        price: 0,
+        category: 'Unknown',
+        provider: {
+          id: 'unknown',
+          name: 'Unknown Provider',
+          delivery_available: false,
+        },
+        images: [],
+      };
+    }
+  }, []);
 
   // Helper function to transform raw cart summary to CartContext format
-  const transformRawCartSummary = (rawCartSummary: RawCartSummary): CartContext => {
+  const transformRawCartSummary = useCallback((rawCartSummary: RawCartSummary): CartContext => {
     // Handle case where items might be undefined or empty
     const cartItems: CartItem[] = (rawCartSummary.items || []).map((item) => ({
       id: item.id,
@@ -62,7 +120,7 @@ const Chat = () => {
       is_empty: rawCartSummary.is_empty !== undefined ? rawCartSummary.is_empty : cartItems.length === 0,
       ready_for_checkout: !rawCartSummary.is_empty && cartItems.length > 0,
     };
-  };
+  }, []);
 
   // Helper function to create messages based on API response
   const createMessagesFromResponse = (responseData: ChatApiResponse): ChatMessage[] => {
@@ -316,6 +374,8 @@ const Chat = () => {
   const handleRawProducts = useCallback(
     (response: StreamingResponse & { type: 'raw_products' }) => {
       console.log('🛍️ handleRawProducts called with:', response);
+      console.log('🛍️ Number of raw products:', response.products?.length);
+      console.log('🛍️ Active chat ID:', activeChatId);
       setIsLoading(false);
 
       // Update session ID if provided
@@ -323,9 +383,16 @@ const Chat = () => {
         setSessionId(response.session_id);
       }
 
+      // Check if products exist
+      if (!response.products || response.products.length === 0) {
+        console.warn('⚠️ No products in raw_products response');
+        removeThinkingMessages();
+        return;
+      }
+
       // Transform raw products to Product format
       const transformedProducts: Product[] = response.products.map(transformRawProduct);
-      console.log('📦 Transformed products:', transformedProducts.length);
+      console.log('📦 Transformed products:', transformedProducts.length, transformedProducts);
 
       // Create product list message
       const productMessage: ChatMessage = {
@@ -333,11 +400,18 @@ const Chat = () => {
         type: 'bot_product_list',
         products: transformedProducts,
       };
+      console.log('📝 Created product message:', productMessage);
 
       // Remove ALL thinking messages and add product message
-      setChats((prev) =>
-        prev.map((c) => {
-          if (c.id !== activeChatId) return c;
+      setChats((prev) => {
+        console.log('🔄 Updating chats state, current chats:', prev.length);
+        return prev.map((c) => {
+          if (c.id !== activeChatId) {
+            console.log('⏭️ Skipping chat:', c.id);
+            return c;
+          }
+
+          console.log('🎯 Updating active chat:', c.id, 'Current messages:', c.messages.length);
 
           // Filter out ALL thinking and tool executing messages
           const messagesWithoutThinking = c.messages.filter(
@@ -346,16 +420,19 @@ const Chat = () => {
 
           console.log('🗑️ Removing thinking messages in handleRawProducts, before:', c.messages.length, 'after:', messagesWithoutThinking.length);
 
+          const newMessages = [...messagesWithoutThinking, productMessage];
+          console.log('✨ New messages array length:', newMessages.length);
+
           return {
             ...c,
-            messages: [...messagesWithoutThinking, productMessage],
+            messages: newMessages,
           };
-        }),
-      );
+        });
+      });
 
       console.log('✅ Raw products handled, thinking messages removed');
     },
-    [activeChatId, transformRawProduct],
+    [activeChatId, transformRawProduct, removeThinkingMessages],
   );
 
   const handleRawCart = useCallback(
