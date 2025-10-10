@@ -1,7 +1,16 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { AppLayout, Sidebar, Header } from '@components';
 import ChatArea from './ChatArea';
-import { ChatMessage, ChatSession, ChatApiResponse, StreamingResponse, RawProduct, RawCartSummary, CartContext, CartItem } from '@interfaces';
+import {
+  ChatMessage,
+  ChatSession,
+  ChatApiResponse,
+  StreamingResponse,
+  RawProduct,
+  RawCartSummary,
+  CartContext,
+  CartItem,
+} from '@interfaces';
 import { useChatStream } from '../../hooks';
 import { Product } from '@interfaces';
 
@@ -24,31 +33,33 @@ const Chat = () => {
 
     try {
       // Handle inconsistent API structure - some products have different field names
-      const providerId = rawProduct.provider_id ||
+      const providerId =
+        rawProduct.provider_id ||
         rawProduct.provider_details?.id ||
         (rawProduct as any).provider?.id ||
         'unknown';
 
-      const providerName = rawProduct.provider_name ||
+      const providerName =
+        rawProduct.provider_name ||
         rawProduct.provider_details?.descriptor?.name ||
         (rawProduct as any).provider?.descriptor?.name ||
         (rawProduct as any).bpp_details?.name ||
         'Unknown Provider';
 
-      let productImages = rawProduct.images ||
-        rawProduct.item_details?.descriptor?.images ||
-        [];
+      let productImages = rawProduct.images || rawProduct.item_details?.descriptor?.images || [];
 
       // Handle images - they can be strings or objects with {url, type, alt_text}
       if (Array.isArray(productImages) && productImages.length > 0) {
-        productImages = productImages.map((img: any) => {
-          if (typeof img === 'string') {
-            return img;
-          } else if (typeof img === 'object' && img.url) {
-            return img.url;
-          }
-          return '';
-        }).filter((url: string) => url && url.trim() !== '');
+        productImages = productImages
+          .map((img: any) => {
+            if (typeof img === 'string') {
+              return img;
+            } else if (typeof img === 'object' && img.url) {
+              return img.url;
+            }
+            return '';
+          })
+          .filter((url: string) => url && url.trim() !== '');
       }
 
       console.log('🖼️ Product images for', rawProduct.name, ':', productImages);
@@ -60,7 +71,8 @@ const Chat = () => {
           categoryString = rawProduct.category;
         } else if (typeof rawProduct.category === 'object' && (rawProduct.category as any).name) {
           // Category is an object, extract the name
-          categoryString = (rawProduct.category as any).name || (rawProduct.category as any).id || 'Uncategorized';
+          categoryString =
+            (rawProduct.category as any).name || (rawProduct.category as any).id || 'Uncategorized';
         }
       } else if (rawProduct.item_details?.category_id) {
         categoryString = rawProduct.item_details.category_id;
@@ -69,7 +81,8 @@ const Chat = () => {
       const transformed = {
         id: rawProduct.id,
         name: rawProduct.name || rawProduct.item_details?.descriptor?.name || 'Unnamed Product',
-        description: rawProduct.description ||
+        description:
+          rawProduct.description ||
           rawProduct.long_description ||
           rawProduct.item_details?.descriptor?.short_desc ||
           rawProduct.item_details?.descriptor?.long_desc ||
@@ -117,7 +130,10 @@ const Chat = () => {
       total_price: item.subtotal,
       provider_id: item.provider_id,
       // Extract provider name from provider object or use provider_id as fallback
-      provider_name: item.provider?.descriptor?.name || item.provider?.id?.split('_').pop() || 'Unknown Provider',
+      provider_name:
+        item.provider?.descriptor?.name ||
+        item.provider?.id?.split('_').pop() ||
+        'Unknown Provider',
       location_id: item.location_id,
       fulfillment_id: item.fulfillment_id,
       category: item.category,
@@ -129,7 +145,8 @@ const Chat = () => {
       items: cartItems,
       total_items: rawCartSummary.total_items || 0,
       total_value: rawCartSummary.total_value || 0,
-      is_empty: rawCartSummary.is_empty !== undefined ? rawCartSummary.is_empty : cartItems.length === 0,
+      is_empty:
+        rawCartSummary.is_empty !== undefined ? rawCartSummary.is_empty : cartItems.length === 0,
       ready_for_checkout: !rawCartSummary.is_empty && cartItems.length > 0,
     };
   }, []);
@@ -239,10 +256,15 @@ const Chat = () => {
 
         // Filter out ALL thinking and tool executing messages
         const messagesWithoutThinking = c.messages.filter(
-          (m) => m.type !== 'bot_thinking' && m.type !== 'bot_tool_executing'
+          (m) => m.type !== 'bot_thinking' && m.type !== 'bot_tool_executing',
         );
 
-        console.log('🗑️ Removing thinking/tool messages, before:', c.messages.length, 'after:', messagesWithoutThinking.length);
+        console.log(
+          '🗑️ Removing thinking/tool messages, before:',
+          c.messages.length,
+          'after:',
+          messagesWithoutThinking.length,
+        );
 
         return {
           ...c,
@@ -276,7 +298,7 @@ const Chat = () => {
 
           return {
             ...c,
-            messages: [...messagesWithoutThinking, thinkingMsg]
+            messages: [...messagesWithoutThinking, thinkingMsg],
           };
         }),
       );
@@ -309,7 +331,7 @@ const Chat = () => {
 
           return {
             ...c,
-            messages: [...messagesWithoutToolExec, toolMsg]
+            messages: [...messagesWithoutToolExec, toolMsg],
           };
         }),
       );
@@ -366,10 +388,15 @@ const Chat = () => {
 
           // Filter out ALL thinking and tool executing messages
           const messagesWithoutThinking = c.messages.filter(
-            (m) => m.type !== 'bot_thinking' && m.type !== 'bot_tool_executing'
+            (m) => m.type !== 'bot_thinking' && m.type !== 'bot_tool_executing',
           );
 
-          console.log('🗑️ Removing thinking messages in handleResponse, before:', c.messages.length, 'after:', messagesWithoutThinking.length);
+          console.log(
+            '🗑️ Removing thinking messages in handleResponse, before:',
+            c.messages.length,
+            'after:',
+            messagesWithoutThinking.length,
+          );
 
           return {
             ...c,
@@ -403,7 +430,9 @@ const Chat = () => {
       }
 
       // Transform raw products to Product format
-      const transformedProducts: Product[] = response.products.map(transformRawProduct);
+      const filteredProducts = [response.products[0]];
+      // const transformedProducts: Product[] = response.products.map(transformRawProduct);
+      const transformedProducts: Product[] = filteredProducts.map(transformRawProduct);
       console.log('📦 Transformed products:', transformedProducts.length, transformedProducts);
 
       // Create product list message
@@ -427,10 +456,15 @@ const Chat = () => {
 
           // Filter out ALL thinking and tool executing messages
           const messagesWithoutThinking = c.messages.filter(
-            (m) => m.type !== 'bot_thinking' && m.type !== 'bot_tool_executing'
+            (m) => m.type !== 'bot_thinking' && m.type !== 'bot_tool_executing',
           );
 
-          console.log('🗑️ Removing thinking messages in handleRawProducts, before:', c.messages.length, 'after:', messagesWithoutThinking.length);
+          console.log(
+            '🗑️ Removing thinking messages in handleRawProducts, before:',
+            c.messages.length,
+            'after:',
+            messagesWithoutThinking.length,
+          );
 
           const newMessages = [...messagesWithoutThinking, productMessage];
           console.log('✨ New messages array length:', newMessages.length);
@@ -457,7 +491,11 @@ const Chat = () => {
       }
 
       // Check if cart_summary is valid and has items
-      if (!response.cart_summary || !response.cart_summary.items || response.cart_summary.items.length === 0) {
+      if (
+        !response.cart_summary ||
+        !response.cart_summary.items ||
+        response.cart_summary.items.length === 0
+      ) {
         console.log('⚠️ Skipping raw_cart with empty or invalid cart_summary');
         // Just remove thinking messages without adding cart UI
         removeThinkingMessages();
@@ -491,10 +529,15 @@ const Chat = () => {
 
           // Filter out ALL thinking and tool executing messages
           const messagesWithoutThinking = c.messages.filter(
-            (m) => m.type !== 'bot_thinking' && m.type !== 'bot_tool_executing'
+            (m) => m.type !== 'bot_thinking' && m.type !== 'bot_tool_executing',
           );
 
-          console.log('🗑️ Removing thinking messages in handleRawCart, before:', c.messages.length, 'after:', messagesWithoutThinking.length);
+          console.log(
+            '🗑️ Removing thinking messages in handleRawCart, before:',
+            c.messages.length,
+            'after:',
+            messagesWithoutThinking.length,
+          );
 
           return {
             ...c,

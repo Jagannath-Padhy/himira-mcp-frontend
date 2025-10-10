@@ -103,7 +103,8 @@ const ChatArea = ({ messages, onSend, isLoading = false }: ChatAreaProps) => {
               px: 2.5,
               py: 1.5,
               borderRadius: '12px',
-              background: 'linear-gradient(90deg, rgba(25, 118, 210, 0.08) 0%, rgba(25, 118, 210, 0.12) 50%, rgba(25, 118, 210, 0.08) 100%)',
+              background:
+                'linear-gradient(90deg, rgba(25, 118, 210, 0.08) 0%, rgba(25, 118, 210, 0.12) 50%, rgba(25, 118, 210, 0.08) 100%)',
               backgroundSize: '1000px 100%',
               border: '1px solid',
               borderColor: 'primary.light',
@@ -119,12 +120,7 @@ const ChatArea = ({ messages, onSend, isLoading = false }: ChatAreaProps) => {
               }}
             />
             <Box>
-              <Typography
-                variant="body2"
-                fontWeight={600}
-                color="primary.main"
-                sx={{ mb: 0.25 }}
-              >
+              <Typography variant="body2" fontWeight={600} color="primary.main" sx={{ mb: 0.25 }}>
                 Executing: {m.tool.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
               </Typography>
               <Typography variant="caption" color="text.secondary">

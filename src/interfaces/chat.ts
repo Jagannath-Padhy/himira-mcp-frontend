@@ -215,50 +215,50 @@ export type ChatSession = {
 // SSE Streaming Response Types
 export type StreamingResponse =
   | {
-    type: 'thinking';
-    message: string;
-    timestamp?: string;
-    session_id?: string;
-  }
+      type: 'thinking';
+      message: string;
+      timestamp?: string;
+      session_id?: string;
+    }
   | {
-    type: 'tool_start';
-    tool: string;
-    status: string;
-    session_id?: string;
-    timestamp?: string;
-  }
+      type: 'tool_start';
+      tool: string;
+      status: string;
+      session_id?: string;
+      timestamp?: string;
+    }
   | {
-    type: 'response';
-    content: string;
-    session_id?: string;
-    timestamp?: string;
-    complete?: boolean;
-    data?: ChatApiResponse['data'];
-    context_type?: ContextType;
-  }
+      type: 'response';
+      content: string;
+      session_id?: string;
+      timestamp?: string;
+      complete?: boolean;
+      data?: ChatApiResponse['data'];
+      context_type?: ContextType;
+    }
   | {
-    type: 'raw_products';
-    tool_name?: string;
-    session_id?: string;
-    raw_data?: boolean;
-    biap_specifications?: boolean;
-    timestamp?: string;
-    products: RawProduct[];
-    total_results?: number;
-    search_type?: string;
-    page?: number;
-    page_size?: number;
-  }
+      type: 'raw_products';
+      tool_name?: string;
+      session_id?: string;
+      raw_data?: boolean;
+      biap_specifications?: boolean;
+      timestamp?: string;
+      products: RawProduct[];
+      total_results?: number;
+      search_type?: string;
+      page?: number;
+      page_size?: number;
+    }
   | {
-    type: 'raw_cart';
-    tool_name?: string;
-    session_id?: string;
-    raw_data?: boolean;
-    biap_specifications?: boolean;
-    timestamp?: string;
-    cart_items: RawCartItem[];
-    cart_summary: RawCartSummary;
-  };
+      type: 'raw_cart';
+      tool_name?: string;
+      session_id?: string;
+      raw_data?: boolean;
+      biap_specifications?: boolean;
+      timestamp?: string;
+      cart_items: RawCartItem[];
+      cart_summary: RawCartSummary;
+    };
 
 // Raw Product Type from BIAP API
 // Note: API returns inconsistent structures, so most fields are optional
