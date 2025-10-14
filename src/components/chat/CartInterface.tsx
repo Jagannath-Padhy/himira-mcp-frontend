@@ -120,7 +120,7 @@ const CartInterface = ({ cartContext, onSend }: CartInterfaceProps) => {
                         {item.name}
                       </Typography>
                       <Typography variant="body2" fontWeight={400} color="text.primary">
-                        {item.provider_name} • {item.category}
+                        {item.category}
                       </Typography>
                     </Box>
 

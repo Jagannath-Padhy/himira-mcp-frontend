@@ -8,7 +8,9 @@ import {
   Typography,
   Box,
   Chip,
+  IconButton,
 } from '@mui/material';
+import { Add, Remove } from '@mui/icons-material';
 import { useState } from 'react';
 
 type ProductCardProps = {
@@ -23,10 +25,23 @@ const ProductCard = ({ product, onSend }: ProductCardProps) => {
       ? product.images[0]
       : '/FallbackImage.jpeg'
   );
+  const [quantity, setQuantity] = useState<number>(1);
 
   const handleImageError = () => {
     console.warn('⚠️ Image failed to load for product:', product.name, 'URL:', imgSrc, '- Using fallback image');
     setImgSrc('/FallbackImage.jpeg');
+  };
+
+  const handleIncrement = () => {
+    setQuantity((prev) => prev + 1);
+  };
+
+  const handleDecrement = () => {
+    setQuantity((prev) => (prev > 1 ? prev - 1 : 1));
+  };
+
+  const handleAddToCart = () => {
+    onSend(`add ${quantity} ${product.name} to cart`);
   };
 
   console.log('🎴 Rendering ProductCard:', product.name, 'Images:', product.images);
@@ -140,6 +155,46 @@ const ProductCard = ({ product, onSend }: ProductCardProps) => {
             Provider: {product.provider.name}
           </Typography>
         )}
+
+        {/* Quantity Controls */}
+        <Box
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+          sx={{
+            border: '1px solid rgb(151, 151, 151)',
+            borderRadius: '32px',
+            width: '112px',
+            minWidth: '112px',
+            maxWidth: '112px',
+            minHeight: '44px',
+            bgcolor: 'rgb(255, 255, 255)',
+            mt: 0.5,
+          }}
+        >
+          <IconButton
+            size="small"
+            onClick={handleDecrement}
+            sx={{ width: 24, height: 24 }}
+          >
+            <Remove fontSize="small" />
+          </IconButton>
+          <Typography
+            variant="body1"
+            fontWeight={600}
+            textAlign="center"
+            sx={{ px: 1.875, py: 0.625 }}
+          >
+            {quantity}
+          </Typography>
+          <IconButton
+            size="small"
+            onClick={handleIncrement}
+            sx={{ width: 24, height: 24 }}
+          >
+            <Add fontSize="small" />
+          </IconButton>
+        </Box>
       </CardContent>
 
       <CardActions>
@@ -148,7 +203,7 @@ const ProductCard = ({ product, onSend }: ProductCardProps) => {
           color="primary"
           variant="contained"
           fullWidth
-          onClick={() => onSend(`add ${product.name} to cart`)}
+          onClick={handleAddToCart}
         >
           Add to Cart
         </Button>

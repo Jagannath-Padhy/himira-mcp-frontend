@@ -663,10 +663,10 @@ const Chat = () => {
     if (!hasInitialized.current) {
       hasInitialized.current = true;
 
-      // sendMessage(
-      //   'initialize_shopping (userId: EUSJ0ypAJJVdo3gXrUJe4uIBwDB2, deviceid: ed0bda0dd8c167a73721be5bb142dfc9)',
-      //   false,
-      // );
+      sendMessage(
+        'initialize_shopping (userId: EUSJ0ypAJJVdo3gXrUJe4uIBwDB2, deviceid: ed0bda0dd8c167a73721be5bb142dfc9)',
+        false,
+      );
     }
   }, [sendMessage]); // Include sendMessage in dependencies
 
