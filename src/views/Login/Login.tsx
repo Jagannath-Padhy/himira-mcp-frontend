@@ -1,27 +1,420 @@
-import { useState } from 'react';
-import { Box, Button, Paper, Typography, Stack } from '@mui/material';
-import { MuiTelInput, matchIsValidTel } from 'mui-tel-input';
-import { MuiOtpInput } from 'mui-one-time-password-input';
+import { useState, useEffect } from 'react';
+import { 
+  Box, 
+  Button, 
+  Paper, 
+  Typography, 
+  Stack, 
+  TextField, 
+  Alert, 
+  IconButton, 
+  InputAdornment,
+  Divider,
+  CircularProgress,
+  Fade,
+} from '@mui/material';
+import { 
+  Visibility, 
+  VisibilityOff, 
+  Phone, 
+  Google,
+  ArrowBack,
+} from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+import { login } from '../../lib/auth';
+import { useFirebaseAuth } from '../../hooks';
+import { OTPInput } from '@components';
+import { useUser } from '../../contexts/UserContext';
+
+type LoginStep = 'method' | 'phone' | 'otp' | 'email';
 
 export default function Login() {
-  const [phone, setPhone] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
+  const [currentStep, setCurrentStep] = useState<LoginStep>('method');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [otp, setOtp] = useState('');
+  const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [otpTimer, setOtpTimer] = useState(0);
+  const [confirmationResult, setConfirmationResult] = useState<any>(null);
+  
   const navigate = useNavigate();
+  const { updateUserFromFirebase } = useUser();
+  const {
+    signInWithGoogle,
+    googleLoading,
+    sendOTP,
+    verifyOTP,
+    phoneLoading,
+    error: firebaseError,
+    clearError,
+  } = useFirebaseAuth();
 
-  const handleSendOtp = () => {
-    if (!matchIsValidTel(phone)) return;
-    // mock sending OTP
-    setOtpSent(true);
+  // Timer for OTP resend
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (otpTimer > 0) {
+      timer = setInterval(() => {
+        setOtpTimer((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [otpTimer]);
+
+  const handleTogglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
   };
 
-  const handleVerifyOtp = () => {
-    if (otp.length !== 6) return;
-    // ✅ Save auth before navigating
-    localStorage.setItem('auth', 'true');
-    navigate('/');
+  const handleEmailLogin = () => {
+    // Clear previous error
+    setError('');
+    
+    // Static credentials
+    const validEmail = 'ashish.jain@ondc.org';
+    const validPassword = '12345';
+    
+    if (email === validEmail && password === validPassword) {
+      // Use the auth.ts login function
+      login();
+      navigate('/');
+    } else {
+      setError('Invalid email or password. Please try again.');
+    }
   };
+
+  const handleGoogleLogin = async () => {
+    try {
+      clearError();
+      const user = await signInWithGoogle();
+      console.log('Google login successful:', user);
+      
+      // Store user data in context and localStorage
+      updateUserFromFirebase(user);
+      login();
+      navigate('/');
+    } catch (err) {
+      console.error('Google login failed:', err);
+      setError(firebaseError || 'Google login failed. Please try again.');
+    }
+  };
+
+  const handlePhoneSubmit = async () => {
+    if (!phoneNumber || phoneNumber.length !== 10) {
+      setError('Please enter a valid 10-digit phone number');
+      return;
+    }
+
+    try {
+      clearError();
+      const formattedPhone = `+91${phoneNumber}`;
+      const result = await sendOTP(formattedPhone);
+      setConfirmationResult(result);
+      setCurrentStep('otp');
+      setOtpTimer(120); // 2 minutes timer
+    } catch (err) {
+      console.error('OTP send failed:', err);
+      setError(firebaseError || 'Failed to send OTP. Please try again.');
+    }
+  };
+
+  const handleOTPSubmit = async () => {
+    if (!otp || otp.length !== 6) {
+      setError('Please enter a 6-digit OTP');
+      return;
+    }
+
+    try {
+      clearError();
+      const user = await verifyOTP(confirmationResult, otp);
+      console.log('Phone login successful:', user);
+      
+      // Store user data in context and localStorage
+      updateUserFromFirebase(user);
+      login();
+      navigate('/');
+    } catch (err) {
+      console.error('OTP verification failed:', err);
+      setError(firebaseError || 'Invalid OTP. Please try again.');
+    }
+  };
+
+  const handleResendOTP = async () => {
+    if (otpTimer > 0) return;
+    
+    try {
+      clearError();
+      const formattedPhone = `+91${phoneNumber}`;
+      const result = await sendOTP(formattedPhone);
+      setConfirmationResult(result);
+      setOtpTimer(120);
+      setOtp('');
+    } catch (err) {
+      console.error('OTP resend failed:', err);
+      setError(firebaseError || 'Failed to resend OTP. Please try again.');
+    }
+  };
+
+  const handleOTPChange = (otpValue: string) => {
+    setOtp(otpValue);
+    setError('');
+  };
+
+  const goBack = () => {
+    if (currentStep === 'otp') {
+      setCurrentStep('phone');
+    } else if (currentStep === 'phone') {
+      setCurrentStep('method');
+    } else if (currentStep === 'email') {
+      setCurrentStep('method');
+    }
+    setError('');
+    clearError();
+  };
+
+  const renderMethodSelection = () => (
+    <Stack spacing={2}>
+      <Typography variant="h5" textAlign="center" fontWeight={600} mb={2}>
+        Welcome Back
+      </Typography>
+      
+      <Typography variant="body2" textAlign="center" color="text.secondary" mb={3}>
+        Choose your preferred login method
+      </Typography>
+
+      <Button
+        variant="outlined"
+        fullWidth
+        startIcon={<Phone />}
+        onClick={() => setCurrentStep('phone')}
+        sx={{
+          py: 1.5,
+          borderRadius: 2,
+          fontSize: '1rem',
+          fontWeight: 600,
+        }}
+      >
+        Continue with Phone
+      </Button>
+
+      <Button
+        variant="outlined"
+        fullWidth
+        startIcon={<Google />}
+        onClick={handleGoogleLogin}
+        disabled={googleLoading}
+        sx={{
+          py: 1.5,
+          borderRadius: 2,
+          fontSize: '1rem',
+          fontWeight: 600,
+        }}
+      >
+        {googleLoading ? <CircularProgress size={20} /> : 'Continue with Google'}
+      </Button>
+
+      <Divider sx={{ my: 2 }}>
+        <Typography variant="body2" color="text.secondary">
+          OR
+        </Typography>
+      </Divider>
+
+      <Button
+        variant="text"
+        fullWidth
+        onClick={() => setCurrentStep('email')}
+        sx={{
+          py: 1.5,
+          borderRadius: 2,
+          fontSize: '1rem',
+          fontWeight: 600,
+        }}
+      >
+        Use Email & Password
+      </Button>
+    </Stack>
+  );
+
+  const renderPhoneInput = () => (
+    <Stack spacing={2}>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+        <IconButton onClick={goBack} sx={{ mr: 1 }}>
+          <ArrowBack />
+        </IconButton>
+        <Typography variant="h5" fontWeight={600}>
+          Enter Phone Number
+        </Typography>
+      </Box>
+
+      <Typography variant="body2" color="text.secondary" mb={2}>
+        We'll send you a verification code
+      </Typography>
+
+      <TextField
+        fullWidth
+        label="Phone Number"
+        type="tel"
+        value={phoneNumber}
+        onChange={(e) => {
+          const value = e.target.value.replace(/\D/g, '');
+          if (value.length <= 10) {
+            setPhoneNumber(value);
+          }
+        }}
+        variant="outlined"
+        InputProps={{
+          startAdornment: <InputAdornment position="start">+91</InputAdornment>,
+        }}
+        placeholder="Enter 10-digit phone number"
+        sx={{
+          '& .MuiOutlinedInput-root': {
+            borderRadius: 2,
+          },
+        }}
+      />
+
+      <Button
+        variant="contained"
+        fullWidth
+        onClick={handlePhoneSubmit}
+        disabled={phoneLoading || phoneNumber.length !== 10}
+        sx={{
+          py: 1.5,
+          borderRadius: 2,
+          fontSize: '1rem',
+          fontWeight: 600,
+        }}
+      >
+        {phoneLoading ? <CircularProgress size={20} /> : 'Send OTP'}
+      </Button>
+    </Stack>
+  );
+
+  const renderOTPInput = () => (
+    <Stack spacing={2}>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+        <IconButton onClick={goBack} sx={{ mr: 1 }}>
+          <ArrowBack />
+        </IconButton>
+        <Typography variant="h5" fontWeight={600}>
+          Enter OTP
+        </Typography>
+      </Box>
+
+      <Typography variant="body2" color="text.secondary" mb={2}>
+        We've sent a 6-digit code to +91{phoneNumber}
+      </Typography>
+
+      <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+        <OTPInput
+          length={6}
+          getFullOtp={handleOTPChange}
+          disabled={phoneLoading}
+        />
+      </Box>
+
+      <Button
+        variant="contained"
+        fullWidth
+        onClick={handleOTPSubmit}
+        disabled={otp.length !== 6}
+        sx={{
+          py: 1.5,
+          borderRadius: 2,
+          fontSize: '1rem',
+          fontWeight: 600,
+        }}
+      >
+        Verify OTP
+      </Button>
+
+      <Box sx={{ textAlign: 'center' }}>
+        <Button
+          variant="text"
+          onClick={handleResendOTP}
+          disabled={otpTimer > 0}
+          sx={{
+            fontSize: '0.875rem',
+            textTransform: 'none',
+          }}
+        >
+          {otpTimer > 0
+            ? `Resend OTP in ${Math.floor(otpTimer / 60)}:${String(otpTimer % 60).padStart(2, '0')}`
+            : 'Resend OTP'}
+        </Button>
+      </Box>
+    </Stack>
+  );
+
+  const renderEmailLogin = () => (
+    <Stack spacing={2}>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+        <IconButton onClick={goBack} sx={{ mr: 1 }}>
+          <ArrowBack />
+        </IconButton>
+        <Typography variant="h5" fontWeight={600}>
+          Email Login
+        </Typography>
+      </Box>
+
+      <TextField
+        fullWidth
+        label="Email"
+        type="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        variant="outlined"
+        sx={{
+          '& .MuiOutlinedInput-root': {
+            borderRadius: 2,
+          },
+        }}
+      />
+      
+      <TextField
+        fullWidth
+        label="Password"
+        type={showPassword ? 'text' : 'password'}
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        variant="outlined"
+        InputProps={{
+          endAdornment: (
+            <InputAdornment position="end">
+              <IconButton
+                aria-label="toggle password visibility"
+                onClick={handleTogglePasswordVisibility}
+                edge="end"
+                sx={{ color: 'text.secondary' }}
+              >
+                {showPassword ? <VisibilityOff /> : <Visibility />}
+              </IconButton>
+            </InputAdornment>
+          ),
+        }}
+        sx={{
+          '& .MuiOutlinedInput-root': {
+            borderRadius: 2,
+          },
+        }}
+      />
+      
+      <Button
+        variant="contained"
+        fullWidth
+        onClick={handleEmailLogin}
+        disabled={!email || !password}
+        sx={{
+          py: 1.5,
+          borderRadius: 2,
+          fontSize: '1rem',
+          fontWeight: 600,
+        }}
+      >
+        Login
+      </Button>
+    </Stack>
+  );
 
   return (
     <Box
@@ -31,80 +424,24 @@ export default function Login() {
       height="100vh"
       bgcolor="background.default"
     >
-      <Paper sx={{ p: 4, width: 360, borderRadius: 2 }} elevation={3}>
-        <Typography variant="h5" mb={3} textAlign="center" fontWeight={600}>
-          Welcome Back
-        </Typography>
+      <Paper sx={{ p: 4, width: 400, borderRadius: 2 }} elevation={3}>
+        <Fade in={true}>
+          <Box>
+            {(error || firebaseError) && (
+              <Alert severity="error" sx={{ borderRadius: 2, mb: 2 }}>
+                {error || firebaseError}
+              </Alert>
+            )}
 
-        {!otpSent ? (
-          <Stack spacing={2}>
-            <MuiTelInput
-              value={phone}
-              onChange={setPhone}
-              defaultCountry="IN"
-              fullWidth
-              forceCallingCode
-              label="Phone Number"
-              helperText={phone && !matchIsValidTel(phone) ? 'Enter a valid phone number' : ''}
-              error={phone.length > 0 && !matchIsValidTel(phone)}
-            />
-            <Button
-              variant="contained"
-              color="primary"
-              fullWidth
-              onClick={handleSendOtp}
-              disabled={!matchIsValidTel(phone)}
-            >
-              Send OTP
-            </Button>
-          </Stack>
-        ) : (
-          <Stack spacing={2}>
-            <MuiOtpInput
-              value={otp}
-              onChange={setOtp}
-              length={6}
-              gap={1}
-              TextFieldsProps={{
-                size: 'small',
-                sx: {
-                  '& .MuiOutlinedInput-root': {
-                    width: '100%',
-                    height: 50,
-                    borderRadius: 2,
-                  },
-                  '& .MuiInputBase-input': {
-                    p: 0,
-                    textAlign: 'center',
-                    fontSize: '1.5rem',
-                    fontWeight: 600,
-                    lineHeight: '56px',
-                  },
-                },
-              }}
-            />
+            {currentStep === 'method' && renderMethodSelection()}
+            {currentStep === 'phone' && renderPhoneInput()}
+            {currentStep === 'otp' && renderOTPInput()}
+            {currentStep === 'email' && renderEmailLogin()}
+          </Box>
+        </Fade>
 
-            <Button
-              variant="contained"
-              color="primary"
-              fullWidth
-              onClick={handleVerifyOtp}
-              disabled={otp.length !== 6}
-            >
-              Verify OTP
-            </Button>
-            <Button
-              variant="text"
-              fullWidth
-              onClick={() => {
-                setOtpSent(false);
-                setOtp('');
-              }}
-            >
-              Change Phone Number
-            </Button>
-          </Stack>
-        )}
+        {/* ReCAPTCHA container */}
+        <div id="recaptcha" style={{ display: 'none' }}></div>
       </Paper>
     </Box>
   );

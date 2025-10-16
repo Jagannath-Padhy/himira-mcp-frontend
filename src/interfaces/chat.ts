@@ -191,12 +191,20 @@ export type ChatMessage =
   | { id: string; type: 'user' | 'bot'; content: string }
   | { id: string; type: 'bot_thinking'; content: string }
   | { id: string; type: 'bot_tool_executing'; tool: string; status: string }
+  | { id: string; type: 'bot_conversation_chunk'; content: string; stage?: string }
   | { id: string; type: 'bot_product_list'; products: Product[] }
   | { id: string; type: 'bot_cart_view'; cartContext: CartContext }
   | { id: string; type: 'bot_checkout_stage'; quoteData: QuoteData; journeyContext: JourneyContext }
   | { id: string; type: 'bot_error'; error: ErrorData }
   | { id: string; type: 'bot_order_confirmation'; orderData: OrderData }
-  | { id: string; type: 'bot_success'; message: string; nextOperations?: string[] };
+  | { id: string; type: 'bot_success'; message: string; nextOperations?: string[] }
+  | {
+      id: string;
+      type: 'bot_payment_initiated';
+      orderId: string;
+      amount: number;
+      currency: string;
+    };
 
 export type ErrorData = {
   success: boolean;
@@ -219,6 +227,13 @@ export type StreamingResponse =
       message: string;
       timestamp?: string;
       session_id?: string;
+    }
+  | {
+      type: 'conversation_chunk';
+      message: string;
+      session_id?: string;
+      stage?: string;
+      timestamp?: string;
     }
   | {
       type: 'tool_start';

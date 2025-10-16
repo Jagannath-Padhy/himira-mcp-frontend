@@ -21,12 +21,21 @@ export default function MessageInput({ onSend, isLoading = false }: MessageInput
     <Paper elevation={2} sx={{ display: 'flex', alignItems: 'center' }}>
       <TextField
         fullWidth
-        placeholder="Type your message..."
+        placeholder={isLoading ? "Searching..." : "Type your message..."}
         variant="outlined"
         size="small"
         value={value}
         onChange={(e) => setValue(e.target.value)}
         disabled={isLoading}
+        sx={{
+          cursor: isLoading ? 'not-allowed' : 'text',
+          '& .MuiInputBase-root': {
+            cursor: isLoading ? 'not-allowed' : 'text',
+          },
+          '& .MuiInputBase-input': {
+            cursor: isLoading ? 'not-allowed' : 'text',
+          },
+        }}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();

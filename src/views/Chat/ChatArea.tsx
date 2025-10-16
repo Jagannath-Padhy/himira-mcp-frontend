@@ -9,15 +9,17 @@ import {
   ErrorInterface,
   OrderConfirmation,
   SuccessMessage,
+  PaymentWrapper,
 } from '@components';
 import type { ChatMessage } from '@interfaces';
 import BuildIcon from '@mui/icons-material/Build';
+import { PdfExportButton } from '@components';
 
-type ChatAreaProps = {
+interface ChatAreaProps {
   messages: ChatMessage[];
   onSend: (msg: string) => void;
   isLoading?: boolean;
-};
+}
 
 // Define keyframe animations
 const pulseAnimation = keyframes`
@@ -42,11 +44,15 @@ const shimmerAnimation = keyframes`
 
 const ChatArea = ({ messages, onSend, isLoading = false }: ChatAreaProps) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatContentRef = useRef<HTMLDivElement | null>(null);
+
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
+
+  // Export logic moved into PdfExportButton as a reusable component
 
   const renderMessage = (m: ChatMessage) => {
     console.log('🎨 Rendering message:', {
@@ -85,6 +91,11 @@ const ChatArea = ({ messages, onSend, isLoading = false }: ChatAreaProps) => {
 
     // Tool executing message (animated and distinct from thinking)
     if (m.type === 'bot_tool_executing') {
+      const rawToolName = (m as any).tool ?? (m as any).tool_name ?? (m as any).toolName ?? 'Tool';
+      const toolName = typeof rawToolName === 'string'
+        ? rawToolName.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())
+        : 'Tool';
+      const statusText = (m as any).status ?? (m as any).message ?? 'Running…';
       return (
         <Box
           key={m.id}
@@ -121,13 +132,27 @@ const ChatArea = ({ messages, onSend, isLoading = false }: ChatAreaProps) => {
             />
             <Box>
               <Typography variant="body2" fontWeight={600} color="primary.main" sx={{ mb: 0.25 }}>
-                Executing: {m.tool.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
+                Executing: {toolName}
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                Status: {m.status}
+                Status: {statusText}
               </Typography>
             </Box>
           </Box>
+        </Box>
+      );
+    }
+
+    // Intermediate conversation chunk (status updates between thinking and final response)
+    if (m.type === 'bot_conversation_chunk') {
+      return (
+        <Box key={m.id} sx={{ mb: 1 }}>
+          <MessageBubble type="bot" content={m.content} animated />
+          {/* {m.stage && (
+            <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+              Stage: {m.stage}
+            </Typography>
+          )} */}
         </Box>
       );
     }
@@ -200,14 +225,47 @@ const ChatArea = ({ messages, onSend, isLoading = false }: ChatAreaProps) => {
       );
     }
 
+    // Payment initiated message
+    if (m.type === 'bot_payment_initiated') {
+      console.log('💳 Payment initiated message:', m);
+      return (
+        <PaymentWrapper
+          key={m.id}
+          orderId={m.orderId}
+          amount={m.amount}
+          currency={m.currency}
+          onPaymentSuccess={(paymentId) => {
+            console.log('✅ Payment successful:', paymentId);
+            onSend(`Payment completed successfully. Payment ID: ${paymentId}`);
+          }}
+          onPaymentError={(error) => {
+            console.error('❌ Payment error:', error);
+            onSend(`Payment failed: ${error}`);
+          }}
+          onPaymentCancel={() => {
+            console.log('🚫 Payment cancelled');
+            onSend('Payment was cancelled');
+          }}
+        />
+      );
+    }
+
     return null;
   };
 
   return (
     <Box display="flex" flexDirection="column" height="100%">
       <Stack spacing={2} flexGrow={1} overflow="auto" p={2}>
-        {messages.map(renderMessage)}
-        <div ref={messagesEndRef} />
+        <div ref={chatContentRef}>
+          {messages.map(renderMessage)}
+          <div ref={messagesEndRef} />
+        </div>
+        {/* Export Button - Icon only (compact, like ChatGPT) */}
+        {messages.length > 0 && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 2, my: 3 }}>
+            <PdfExportButton targetRef={chatContentRef} />
+          </Box>
+        )}
       </Stack>
 
       <Box p={2} borderTop={1} borderColor="divider">

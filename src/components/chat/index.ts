@@ -6,3 +6,5 @@ export { default as CheckoutInterface } from './CheckoutInterface';
 export { default as ErrorInterface } from './ErrorInterface';
 export { default as OrderConfirmation } from './OrderConfirmation';
 export { default as SuccessMessage } from './SuccessMessage';
+export { default as RazorpayPayment } from './RazorpayPayment';
+export { default as PaymentWrapper } from './PaymentWrapper';

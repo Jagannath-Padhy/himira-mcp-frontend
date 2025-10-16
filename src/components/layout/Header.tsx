@@ -1,6 +1,9 @@
-import { Box, IconButton, Typography, Badge, Chip } from '@mui/material';
+import { Box, IconButton, Typography, Badge, Chip, Tooltip } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
+import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
+import { useNavigate } from 'react-router-dom';
+import { logout } from '@lib';
 
 type HeaderProps = {
   onMenuClick?: () => void;
@@ -16,6 +19,11 @@ export default function Header({
   onCartClick,
 }: HeaderProps) {
   const formatPrice = (price: number) => `₹${price.toFixed(2)}`;
+  const navigate = useNavigate();
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   return (
     <Box display="flex" alignItems="center" justifyContent="space-between" width="100%">
@@ -35,31 +43,38 @@ export default function Header({
       </Box>
 
       {/* Cart Information */}
-      {cartItemCount > 0 && (
-        <Box display="flex" alignItems="center" gap={2}>
-          <Chip
-            label={`${cartItemCount} items • ${formatPrice(cartTotal)}`}
-            color="primary"
-            variant="outlined"
-            size="small"
-          />
-          <IconButton
-            color="inherit"
-            onClick={onCartClick}
-            sx={{
-              bgcolor: 'primary.main',
-              color: 'white',
-              '&:hover': {
-                bgcolor: 'primary.dark',
-              },
-            }}
-          >
-            <Badge badgeContent={cartItemCount} color="error">
-              <ShoppingCartIcon />
-            </Badge>
+      <Box display="flex" alignItems="center" gap={2}>
+        {cartItemCount > 0 && (
+          <>
+            <Chip
+              label={`${cartItemCount} items • ${formatPrice(cartTotal)}`}
+              color="primary"
+              variant="outlined"
+              size="small"
+            />
+            <IconButton
+              color="inherit"
+              onClick={onCartClick}
+              sx={{
+                bgcolor: 'primary.main',
+                color: 'white',
+                '&:hover': {
+                  bgcolor: 'primary.dark',
+                },
+              }}
+            >
+              <Badge badgeContent={cartItemCount} color="error">
+                <ShoppingCartIcon />
+              </Badge>
+            </IconButton>
+          </>
+        )}
+        <Tooltip title="Logout">
+          <IconButton color="inherit" onClick={handleLogout}>
+            <PowerSettingsNewIcon />
           </IconButton>
-        </Box>
-      )}
+        </Tooltip>
+      </Box>
     </Box>
   );
 }

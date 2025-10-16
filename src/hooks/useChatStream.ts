@@ -7,6 +7,7 @@ export interface UseChatStreamParams {
   onResponse?: (response: StreamingResponse & { type: 'response' }) => void;
   onRawProducts?: (response: StreamingResponse & { type: 'raw_products' }) => void;
   onRawCart?: (response: StreamingResponse & { type: 'raw_cart' }) => void;
+  onConversationChunk?: (response: StreamingResponse & { type: 'conversation_chunk' }) => void;
   onError?: (error: Error) => void;
   onComplete?: () => void;
 }
@@ -17,6 +18,7 @@ export const useChatStream = ({
   onResponse,
   onRawProducts,
   onRawCart,
+  onConversationChunk,
   onError,
   onComplete,
 }: UseChatStreamParams) => {
@@ -103,6 +105,8 @@ export const useChatStream = ({
 
                 if (data.type === 'thinking') {
                   onThinking?.(data.message, data.session_id);
+                } else if (data.type === 'conversation_chunk') {
+                  onConversationChunk?.(data as StreamingResponse & { type: 'conversation_chunk' });
                 } else if (data.type === 'tool_start') {
                   console.log('🔧 Tool execution started:', data.tool);
                   onToolStart?.(data.tool, data.status, data.session_id);

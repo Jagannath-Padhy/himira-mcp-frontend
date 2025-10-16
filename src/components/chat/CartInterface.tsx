@@ -132,7 +132,7 @@ const CartInterface = ({ cartContext, onSend }: CartInterfaceProps) => {
                     </Box>
 
                     {/* Quantity Controls */}
-                    <Box
+                    {/* <Box
                       display="flex"
                       alignItems="center"
                       justifyContent="center"
@@ -168,7 +168,7 @@ const CartInterface = ({ cartContext, onSend }: CartInterfaceProps) => {
                       >
                         <Add fontSize="small" />
                       </IconButton>
-                    </Box>
+                    </Box> */}
                   </Box>
                 </Box>
 

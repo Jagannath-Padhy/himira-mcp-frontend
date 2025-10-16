@@ -1,7 +1,7 @@
 // src/routes/index.tsx
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Chat, Login } from '@views';
-// import ProtectedRoute from './ProtectedRoute';
+import ProtectedRoute from './ProtectedRoute';
 import PublicRoute from './PublicRoute';
 
 const AppRoutes = () => (
@@ -10,9 +10,9 @@ const AppRoutes = () => (
       <Route
         path="/"
         element={
-          // <ProtectedRoute>
+          <ProtectedRoute>
           <Chat />
-          // </ProtectedRoute>
+        </ProtectedRoute>
         }
       />
       <Route

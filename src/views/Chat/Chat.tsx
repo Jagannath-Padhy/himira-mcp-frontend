@@ -13,6 +13,9 @@ import {
 } from '@interfaces';
 import { useChatStream } from '../../hooks';
 import { Product } from '@interfaces';
+import { useUser } from '../../contexts/UserContext';
+import { getOrCreateDeviceId } from '../../utils/deviceFingerprint';
+import { useDeviceFingerprint } from '../../hooks';
 
 const Chat = () => {
   const [chats, setChats] = useState<ChatSession[]>([
@@ -26,6 +29,11 @@ const Chat = () => {
   const [cartState, setCartState] = useState({ itemCount: 0, total: 0 });
 
   const hasInitialized = useRef(false);
+  const { user, isLoading: userLoading } = useUser();
+  const { deviceId, isLoading: deviceLoading } = useDeviceFingerprint();
+  
+  console.log('🔥 User data:', user);
+  console.log('🔍 Device ID:', deviceId, 'Loading:', deviceLoading);
 
   // Helper function to transform raw products to Product format
   const transformRawProduct = useCallback((rawProduct: RawProduct): Product => {
@@ -339,10 +347,37 @@ const Chat = () => {
     [activeChatId],
   );
 
+  // Handle intermediate conversation chunks (status updates between thinking and response)
+  const handleConversationChunk = useCallback(
+    (chunk: StreamingResponse & { type: 'conversation_chunk' }) => {
+      // Update session ID if provided
+      if (chunk.session_id) {
+        setSessionId(chunk.session_id);
+      }
+
+      const chunkMsg: ChatMessage = {
+        id: `chunk${Date.now()}`,
+        type: 'bot_conversation_chunk',
+        content: chunk.message,
+        stage: (chunk as any).stage,
+      };
+
+      setChats((prev) =>
+        prev.map((c) => {
+          if (c.id !== activeChatId) return c;
+          // Keep existing conversation chunks minimal: replace any existing chunk
+          const withoutOldChunks = c.messages.filter((m) => m.type !== 'bot_conversation_chunk');
+          return { ...c, messages: [...withoutOldChunks, chunkMsg] };
+        }),
+      );
+    },
+    [activeChatId],
+  );
+
   const handleResponse = useCallback(
     (response: StreamingResponse & { type: 'response' }) => {
       console.log('🎯 handleResponse called with:', response);
-      setIsLoading(false);
+      // Don't set isLoading to false here - wait for stream complete
 
       // Update session ID if provided
       if (response.session_id) {
@@ -356,6 +391,53 @@ const Chat = () => {
       ) {
         console.log('⏭️ Skipping initialization message, removing thinking messages');
         removeThinkingMessages();
+        return;
+      }
+
+      // Check if this is a payment initialization message
+      if (response.content?.includes('Your order has been initialized')) {
+        console.log('💳 Payment initialization detected');
+
+        // Extract amount from the response content
+        const amountMatch = response.content.match(/₹(\d+\.?\d*)/);
+        const amount = amountMatch ? parseFloat(amountMatch[1]) : 0;
+
+        // Generate a mock order ID (in real implementation, this would come from backend)
+        const orderId = `order_${Date.now()}`;
+
+        // Create payment message
+        const paymentMessage: ChatMessage = {
+          id: `payment_${Date.now()}`,
+          type: 'bot_payment_initiated',
+          orderId: orderId,
+          amount: amount,
+          currency: 'INR',
+        };
+
+        // Add the response message and payment component
+        setChats((prev) =>
+          prev.map((c) => {
+            if (c.id !== activeChatId) return c;
+
+            // Filter out thinking messages and add response + payment
+            const messagesWithoutThinking = c.messages.filter(
+              (m) => m.type !== 'bot_thinking' && m.type !== 'bot_tool_executing',
+            );
+
+            return {
+              ...c,
+              messages: [
+                ...messagesWithoutThinking,
+                {
+                  id: `response_${Date.now()}`,
+                  type: 'bot',
+                  content: response.content,
+                },
+                paymentMessage,
+              ],
+            };
+          }),
+        );
         return;
       }
 
@@ -388,7 +470,10 @@ const Chat = () => {
 
           // Filter out ALL thinking and tool executing messages
           const messagesWithoutThinking = c.messages.filter(
-            (m) => m.type !== 'bot_thinking' && m.type !== 'bot_tool_executing',
+            (m) =>
+              m.type !== 'bot_thinking' &&
+              m.type !== 'bot_tool_executing' &&
+              m.type !== 'bot_conversation_chunk',
           );
 
           console.log(
@@ -415,7 +500,7 @@ const Chat = () => {
       console.log('🛍️ handleRawProducts called with:', response);
       console.log('🛍️ Number of raw products:', response.products?.length);
       console.log('🛍️ Active chat ID:', activeChatId);
-      setIsLoading(false);
+      // Don't set isLoading to false here - wait for stream complete
 
       // Update session ID if provided
       if (response.session_id) {
@@ -430,9 +515,9 @@ const Chat = () => {
       }
 
       // Transform raw products to Product format
-      const filteredProducts = [response.products[0]];
-      // const transformedProducts: Product[] = response.products.map(transformRawProduct);
-      const transformedProducts: Product[] = filteredProducts.map(transformRawProduct);
+      // const filteredProducts = [response.products[0]];
+      const transformedProducts: Product[] = response.products.map(transformRawProduct);
+      // const transformedProducts: Product[] = filteredProducts.map(transformRawProduct);
       console.log('📦 Transformed products:', transformedProducts.length, transformedProducts);
 
       // Create product list message
@@ -443,7 +528,7 @@ const Chat = () => {
       };
       console.log('📝 Created product message:', productMessage);
 
-      // Remove ALL thinking messages and add product message
+      // Remove ALL thinking, tool executing, and previous product list messages
       setChats((prev) => {
         console.log('🔄 Updating chats state, current chats:', prev.length);
         return prev.map((c) => {
@@ -454,29 +539,33 @@ const Chat = () => {
 
           console.log('🎯 Updating active chat:', c.id, 'Current messages:', c.messages.length);
 
-          // Filter out ALL thinking and tool executing messages
-          const messagesWithoutThinking = c.messages.filter(
-            (m) => m.type !== 'bot_thinking' && m.type !== 'bot_tool_executing',
+          // Filter out thinking, tool executing, conversation chunks, and existing product lists
+          const messagesWithoutDuplicates = c.messages.filter(
+            (m) =>
+              m.type !== 'bot_thinking' &&
+              m.type !== 'bot_tool_executing' &&
+              m.type !== 'bot_conversation_chunk' &&
+              m.type !== 'bot_product_list',
           );
 
           console.log(
-            '🗑️ Removing thinking messages in handleRawProducts, before:',
+            '🗑️ Removing duplicate messages in handleRawProducts, before:',
             c.messages.length,
             'after:',
-            messagesWithoutThinking.length,
+            messagesWithoutDuplicates.length,
           );
 
-          const newMessages = [...messagesWithoutThinking, productMessage];
+          const newMessages = [...messagesWithoutDuplicates, productMessage];
           console.log('✨ New messages array length:', newMessages.length);
 
           return {
-            ...c,
+              ...c,
             messages: newMessages,
           };
         });
       });
 
-      console.log('✅ Raw products handled, thinking messages removed');
+      console.log('✅ Raw products handled, duplicate messages removed');
     },
     [activeChatId, transformRawProduct, removeThinkingMessages],
   );
@@ -490,23 +579,80 @@ const Chat = () => {
         setSessionId(response.session_id);
       }
 
-      // Check if cart_summary is valid and has items
-      if (
-        !response.cart_summary ||
-        !response.cart_summary.items ||
-        response.cart_summary.items.length === 0
-      ) {
-        console.log('⚠️ Skipping raw_cart with empty or invalid cart_summary');
-        // Just remove thinking messages without adding cart UI
+      // Normalize cart summary: if items are missing in cart_summary, build from cart_items
+      const hasSummaryItems = Array.isArray((response as any).cart_summary?.items) &&
+        ((response as any).cart_summary.items as unknown[]).length > 0;
+
+      let normalizedCartSummary = (response as any).cart_summary as any;
+
+      if (!hasSummaryItems && Array.isArray((response as any).cart_items) && (response as any).cart_items.length > 0) {
+        try {
+          const cartItems = (response as any).cart_items as any[];
+
+          const extractFirstImageUrl = (product: any): string | undefined => {
+            const imagesFromDescriptor = product?.descriptor?.images;
+            if (Array.isArray(imagesFromDescriptor) && imagesFromDescriptor.length > 0) {
+              return imagesFromDescriptor[0];
+            }
+            const tags = product?.tags;
+            if (Array.isArray(tags)) {
+              const imageTag = tags.find((t: any) => t?.code === 'image');
+              const urlEntry = imageTag?.list?.find((l: any) => l?.code === 'url');
+              if (urlEntry?.value && typeof urlEntry.value === 'string') return urlEntry.value;
+            }
+            return undefined;
+          };
+
+          const synthesizedItems = cartItems.map((ci: any) => {
+            const product = ci?.item?.product ?? {};
+            const provider = ci?.item?.provider ?? {};
+            const quantityFromItem = Number(ci?.count ?? product?.quantity?.count ?? 1) || 1;
+            const priceValue = Number(product?.price?.value ?? 0) || 0;
+            const subtotalValue = typeof product?.subtotal === 'number' ? product.subtotal : priceValue * quantityFromItem;
+
+            return {
+              id: ci?.item?.id ?? ci?.id ?? String(Date.now()),
+              name: product?.descriptor?.name ?? 'Item',
+              price: priceValue,
+              quantity: quantityFromItem,
+              category: product?.category_id ?? 'Uncategorized',
+              image_url: extractFirstImageUrl(product),
+              description: product?.descriptor?.short_desc ?? product?.descriptor?.long_desc,
+              provider: {
+                id: provider?.id ?? '',
+                descriptor: { name: provider?.descriptor?.name ?? 'Unknown Provider' },
+              },
+              provider_id: provider?.id ?? '',
+              location_id: product?.location_id ?? '',
+              fulfillment_id: product?.fulfillment_id ?? '',
+              subtotal: subtotalValue,
+            };
+          });
+
+          normalizedCartSummary = {
+            items: synthesizedItems,
+            total_items: (response as any).cart_summary?.total_items ?? synthesizedItems.reduce((acc: number, it: any) => acc + (Number(it.quantity) || 0), 0),
+            total_value: (response as any).cart_summary?.total_value ?? synthesizedItems.reduce((acc: number, it: any) => acc + (Number(it.subtotal) || 0), 0),
+            is_empty: false,
+          };
+        } catch (e) {
+          console.warn('⚠️ Failed to synthesize cart summary from cart_items:', e);
+        }
+      }
+
+      // If still no items and nothing to show, just clean up and exit
+      const hasItemsNow = Array.isArray(normalizedCartSummary?.items) && normalizedCartSummary.items.length > 0;
+      if (!hasItemsNow) {
+        console.log('⚠️ Skipping raw_cart with empty items after normalization');
         removeThinkingMessages();
-        setIsLoading(false);
+        // Don't set isLoading to false here - wait for stream complete
         return;
       }
 
-      setIsLoading(false);
+      // Don't set isLoading to false here - wait for stream complete
 
       // Transform raw cart summary to CartContext format
-      const cartContext = transformRawCartSummary(response.cart_summary);
+      const cartContext = transformRawCartSummary(normalizedCartSummary);
       console.log('🛒 Transformed cart context:', cartContext);
 
       // Update cart state in header
@@ -522,31 +668,35 @@ const Chat = () => {
         cartContext: cartContext,
       };
 
-      // Remove ALL thinking messages and add cart message
+      // Remove ALL thinking, tool executing, conversation chunks, and previous cart view messages
       setChats((prev) =>
         prev.map((c) => {
           if (c.id !== activeChatId) return c;
 
-          // Filter out ALL thinking and tool executing messages
-          const messagesWithoutThinking = c.messages.filter(
-            (m) => m.type !== 'bot_thinking' && m.type !== 'bot_tool_executing',
+          // Filter out thinking, tool executing, conversation chunks, and existing cart views
+          const messagesWithoutDuplicates = c.messages.filter(
+            (m) =>
+              m.type !== 'bot_thinking' &&
+              m.type !== 'bot_tool_executing' &&
+              m.type !== 'bot_conversation_chunk' &&
+              m.type !== 'bot_cart_view',
           );
 
           console.log(
-            '🗑️ Removing thinking messages in handleRawCart, before:',
+            '🗑️ Removing duplicate messages in handleRawCart, before:',
             c.messages.length,
             'after:',
-            messagesWithoutThinking.length,
+            messagesWithoutDuplicates.length,
           );
 
           return {
             ...c,
-            messages: [...messagesWithoutThinking, cartMessage],
+            messages: [...messagesWithoutDuplicates, cartMessage],
           };
         }),
       );
 
-      console.log('✅ Raw cart handled, thinking messages removed');
+      console.log('✅ Raw cart handled, duplicate messages removed');
     },
     [activeChatId, transformRawCartSummary, removeThinkingMessages],
   );
@@ -597,6 +747,7 @@ const Chat = () => {
   const { sendMessage: sendStreamMessage } = useChatStream({
     onThinking: handleThinking,
     onToolStart: handleToolStart,
+    onConversationChunk: handleConversationChunk,
     onResponse: handleResponse,
     onRawProducts: handleRawProducts,
     onRawCart: handleRawCart,
@@ -658,17 +809,39 @@ const Chat = () => {
     sendMessage('show me my cart');
   }, [sendMessage]);
 
-  // Initialize shopping session only once when component mounts
+  // Initialize shopping session only once when component mounts and user is available
   useEffect(() => {
-    if (!hasInitialized.current) {
-      hasInitialized.current = true;
+    const initializeSession = async () => {
+      if (!hasInitialized.current && !userLoading && user?.uid) {
+        hasInitialized.current = true;
 
-      sendMessage(
-        'initialize_shopping (userId: EUSJ0ypAJJVdo3gXrUJe4uIBwDB2, deviceid: ed0bda0dd8c167a73721be5bb142dfc9)',
-        false,
-      );
-    }
-  }, [sendMessage]); // Include sendMessage in dependencies
+        try {
+          // Get or create device ID using browser fingerprinting
+          const deviceId = await getOrCreateDeviceId();
+
+          const initMessage = `initialize_shopping (userId: ${user.uid}, deviceid: ${deviceId})`;
+          console.log('🚀 Initializing shopping session with:', initMessage);
+          
+          sendMessage(initMessage, false);
+        } catch (error) {
+          console.error('❌ Error initializing shopping session:', error);
+          
+          // Fallback to basic device ID if fingerprinting fails
+          const fallbackDeviceId = localStorage.getItem('device_id') || `device_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          if (!localStorage.getItem('device_id')) {
+            localStorage.setItem('device_id', fallbackDeviceId);
+          }
+
+          const initMessage = `initialize_shopping (userId: ${user.uid}, deviceid: ${fallbackDeviceId})`;
+          console.log('🚀 Initializing shopping session with fallback:', initMessage);
+          
+          sendMessage(initMessage, false);
+        }
+      }
+    };
+
+    initializeSession();
+  }, [sendMessage, user, userLoading]); // Include user and userLoading in dependencies
 
   return (
     <AppLayout
