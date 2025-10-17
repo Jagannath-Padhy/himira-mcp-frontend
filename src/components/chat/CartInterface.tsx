@@ -6,8 +6,8 @@ import {
   Button,
   IconButton,
 } from '@mui/material';
-import { Add, Remove, Delete } from '@mui/icons-material';
-import { CartContext, CartItem } from '@interfaces';
+import { Delete } from '@mui/icons-material';
+import { CartContext } from '@interfaces';
 
 type CartInterfaceProps = {
   cartContext: CartContext;
@@ -17,20 +17,12 @@ type CartInterfaceProps = {
 const CartInterface = ({ cartContext, onSend }: CartInterfaceProps) => {
   const formatPrice = (price: number) => `₹${price.toFixed(2)}`;
 
-  const handleQuantityChange = (item: CartItem, newQuantity: number) => {
-    if (newQuantity <= 0) {
-      onSend(`remove ${item.name} from cart`);
-    } else {
-      onSend(`update quantity of ${item.name} to ${newQuantity}`);
-    }
-  };
-
-  const handleRemoveItem = (item: CartItem) => {
-    onSend(`remove ${item.name} from cart`);
+  const handleClearCart = () => {
+    onSend('Clear cart');
   };
 
   const handleCheckout = () => {
-    onSend('proceed to checkout');
+    onSend('Proceed to checkout');
   };
 
   if (cartContext.is_empty) {
@@ -172,11 +164,12 @@ const CartInterface = ({ cartContext, onSend }: CartInterfaceProps) => {
                   </Box>
                 </Box>
 
-                {/* Remove Button */}
+                {/* Clear Cart Button */}
                 <IconButton
                   size="small"
-                  onClick={() => handleRemoveItem(item)}
+                  onClick={handleClearCart}
                   sx={{ width: 20, height: 20, alignSelf: 'flex-start' }}
+                  title="Clear Cart"
                 >
                   <Delete fontSize="small" />
                 </IconButton>

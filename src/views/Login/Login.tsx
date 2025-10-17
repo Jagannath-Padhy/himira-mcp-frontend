@@ -213,7 +213,7 @@ export default function Login() {
         {googleLoading ? <CircularProgress size={20} /> : 'Continue with Google'}
       </Button>
 
-      <Divider sx={{ my: 2 }}>
+      {/* <Divider sx={{ my: 2 }}>
         <Typography variant="body2" color="text.secondary">
           OR
         </Typography>
@@ -231,7 +231,7 @@ export default function Login() {
         }}
       >
         Use Email & Password
-      </Button>
+      </Button> */}
     </Stack>
   );
 
@@ -346,75 +346,75 @@ export default function Login() {
     </Stack>
   );
 
-  const renderEmailLogin = () => (
-    <Stack spacing={2}>
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-        <IconButton onClick={goBack} sx={{ mr: 1 }}>
-          <ArrowBack />
-        </IconButton>
-        <Typography variant="h5" fontWeight={600}>
-          Email Login
-        </Typography>
-      </Box>
+  // const renderEmailLogin = () => (
+  //   <Stack spacing={2}>
+  //     <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+  //       <IconButton onClick={goBack} sx={{ mr: 1 }}>
+  //         <ArrowBack />
+  //       </IconButton>
+  //       <Typography variant="h5" fontWeight={600}>
+  //         Email Login
+  //       </Typography>
+  //     </Box>
 
-      <TextField
-        fullWidth
-        label="Email"
-        type="email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        variant="outlined"
-        sx={{
-          '& .MuiOutlinedInput-root': {
-            borderRadius: 2,
-          },
-        }}
-      />
+  //     <TextField
+  //       fullWidth
+  //       label="Email"
+  //       type="email"
+  //       value={email}
+  //       onChange={(e) => setEmail(e.target.value)}
+  //       variant="outlined"
+  //       sx={{
+  //         '& .MuiOutlinedInput-root': {
+  //           borderRadius: 2,
+  //         },
+  //       }}
+  //     />
       
-      <TextField
-        fullWidth
-        label="Password"
-        type={showPassword ? 'text' : 'password'}
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        variant="outlined"
-        InputProps={{
-          endAdornment: (
-            <InputAdornment position="end">
-              <IconButton
-                aria-label="toggle password visibility"
-                onClick={handleTogglePasswordVisibility}
-                edge="end"
-                sx={{ color: 'text.secondary' }}
-              >
-                {showPassword ? <VisibilityOff /> : <Visibility />}
-              </IconButton>
-            </InputAdornment>
-          ),
-        }}
-        sx={{
-          '& .MuiOutlinedInput-root': {
-            borderRadius: 2,
-          },
-        }}
-      />
+  //     <TextField
+  //       fullWidth
+  //       label="Password"
+  //       type={showPassword ? 'text' : 'password'}
+  //       value={password}
+  //       onChange={(e) => setPassword(e.target.value)}
+  //       variant="outlined"
+  //       InputProps={{
+  //         endAdornment: (
+  //           <InputAdornment position="end">
+  //             <IconButton
+  //               aria-label="toggle password visibility"
+  //               onClick={handleTogglePasswordVisibility}
+  //               edge="end"
+  //               sx={{ color: 'text.secondary' }}
+  //             >
+  //               {showPassword ? <VisibilityOff /> : <Visibility />}
+  //             </IconButton>
+  //           </InputAdornment>
+  //         ),
+  //       }}
+  //       sx={{
+  //         '& .MuiOutlinedInput-root': {
+  //           borderRadius: 2,
+  //         },
+  //       }}
+  //     />
       
-      <Button
-        variant="contained"
-        fullWidth
-        onClick={handleEmailLogin}
-        disabled={!email || !password}
-        sx={{
-          py: 1.5,
-          borderRadius: 2,
-          fontSize: '1rem',
-          fontWeight: 600,
-        }}
-      >
-        Login
-      </Button>
-    </Stack>
-  );
+  //     <Button
+  //       variant="contained"
+  //       fullWidth
+  //       onClick={handleEmailLogin}
+  //       disabled={!email || !password}
+  //       sx={{
+  //         py: 1.5,
+  //         borderRadius: 2,
+  //         fontSize: '1rem',
+  //         fontWeight: 600,
+  //       }}
+  //     >
+  //       Login
+  //     </Button>
+  //   </Stack>
+  // );
 
   return (
     <Box
@@ -436,7 +436,7 @@ export default function Login() {
             {currentStep === 'method' && renderMethodSelection()}
             {currentStep === 'phone' && renderPhoneInput()}
             {currentStep === 'otp' && renderOTPInput()}
-            {currentStep === 'email' && renderEmailLogin()}
+            {/* {currentStep === 'email' && renderEmailLogin()} */}
           </Box>
         </Fade>
 
