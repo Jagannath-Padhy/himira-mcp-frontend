@@ -102,6 +102,7 @@ export const useFirebaseAuth = (): UseFirebaseAuthReturn => {
     confirmationResult: ConfirmationResult, 
     otp: string
   ): Promise<User> => {
+    setPhoneLoading(true);
     clearError();
 
     try {
@@ -115,6 +116,8 @@ export const useFirebaseAuth = (): UseFirebaseAuthReturn => {
         : 'OTP verification failed. Please try again.';
       setError(errorMessage);
       throw new Error(errorMessage);
+    } finally {
+      setPhoneLoading(false);
     }
   }, [clearError]);
 

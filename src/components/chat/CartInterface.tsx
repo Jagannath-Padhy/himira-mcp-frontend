@@ -7,7 +7,9 @@ import {
   IconButton,
 } from '@mui/material';
 import { Delete } from '@mui/icons-material';
+import { useState } from 'react';
 import { CartContext } from '@interfaces';
+import ClearCartModal from './ClearCartModal';
 
 type CartInterfaceProps = {
   cartContext: CartContext;
@@ -15,10 +17,21 @@ type CartInterfaceProps = {
 };
 
 const CartInterface = ({ cartContext, onSend }: CartInterfaceProps) => {
+  const [openDeleteModal, setOpenDeleteModal] = useState(false);
+  
   const formatPrice = (price: number) => `₹${price.toFixed(2)}`;
+
+  const handleOpenDeleteModal = () => {
+    setOpenDeleteModal(true);
+  };
+
+  const handleCloseDeleteModal = () => {
+    setOpenDeleteModal(false);
+  };
 
   const handleClearCart = () => {
     onSend('Clear cart');
+    setOpenDeleteModal(false);
   };
 
   const handleCheckout = () => {
@@ -167,7 +180,7 @@ const CartInterface = ({ cartContext, onSend }: CartInterfaceProps) => {
                 {/* Clear Cart Button */}
                 <IconButton
                   size="small"
-                  onClick={handleClearCart}
+                  onClick={handleOpenDeleteModal}
                   sx={{ width: 20, height: 20, alignSelf: 'flex-start' }}
                   title="Clear Cart"
                 >
@@ -267,6 +280,13 @@ const CartInterface = ({ cartContext, onSend }: CartInterfaceProps) => {
           </Card>
         </Box>
       </Box>
+
+      {/* Clear Cart Confirmation Modal */}
+      <ClearCartModal
+        open={openDeleteModal}
+        onClose={handleCloseDeleteModal}
+        onConfirm={handleClearCart}
+      />
     </Box>
   );
 };

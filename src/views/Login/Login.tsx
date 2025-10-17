@@ -32,7 +32,7 @@ export default function Login() {
   const [currentStep, setCurrentStep] = useState<LoginStep>('method');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('7351477479');
   const [otp, setOtp] = useState('');
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -317,7 +317,7 @@ export default function Login() {
         variant="contained"
         fullWidth
         onClick={handleOTPSubmit}
-        disabled={otp.length !== 6}
+        disabled={phoneLoading || otp.length !== 6}
         sx={{
           py: 1.5,
           borderRadius: 2,
@@ -325,22 +325,26 @@ export default function Login() {
           fontWeight: 600,
         }}
       >
-        Verify OTP
+        {phoneLoading ? <CircularProgress size={20} /> : 'Verify OTP'}
       </Button>
 
       <Box sx={{ textAlign: 'center' }}>
         <Button
           variant="text"
           onClick={handleResendOTP}
-          disabled={otpTimer > 0}
+          disabled={phoneLoading || otpTimer > 0}
           sx={{
             fontSize: '0.875rem',
             textTransform: 'none',
           }}
         >
-          {otpTimer > 0
-            ? `Resend OTP in ${Math.floor(otpTimer / 60)}:${String(otpTimer % 60).padStart(2, '0')}`
-            : 'Resend OTP'}
+        
+      
+          {otpTimer > 0 ? (
+            `Resend OTP in ${Math.floor(otpTimer / 60)}:${String(otpTimer % 60).padStart(2, '0')}`
+          ) : (
+            'Resend OTP'
+          )}
         </Button>
       </Box>
     </Stack>
@@ -424,7 +428,7 @@ export default function Login() {
       height="100vh"
       bgcolor="background.default"
     >
-      <Paper sx={{ p: 4, width: 400, borderRadius: 2 }} elevation={3}>
+      <Paper sx={{ p: 4, width: 410, borderRadius: 2 }} elevation={3}>
         <Fade in={true}>
           <Box>
             {(error || firebaseError) && (

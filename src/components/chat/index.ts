@@ -8,3 +8,4 @@ export { default as OrderConfirmation } from './OrderConfirmation';
 export { default as SuccessMessage } from './SuccessMessage';
 export { default as RazorpayPayment } from './RazorpayPayment';
 export { default as PaymentWrapper } from './PaymentWrapper';
+export { default as ClearCartModal } from './ClearCartModal';
