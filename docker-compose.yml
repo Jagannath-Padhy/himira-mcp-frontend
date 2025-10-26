@@ -7,7 +7,7 @@ services:
       dockerfile: Dockerfile
     container_name: ${CONTAINER_NAME}
     ports:
-      - "${PORT}:80"
+      - "${PORT}:5001"
     env_file:
       - .env
     restart: always
