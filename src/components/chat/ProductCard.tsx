@@ -44,8 +44,6 @@ const ProductCard = ({ product, onSend }: ProductCardProps) => {
     onSend(`add ${quantity} ${product.name} to cart`);
   };
 
-  console.log('🎴 Rendering ProductCard:', product.name, 'Images:', product.images);
-
   return (
     <Card
       sx={{

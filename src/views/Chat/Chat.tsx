@@ -15,7 +15,6 @@ import { useChatStream } from '../../hooks';
 import { Product } from '@interfaces';
 import { useUser } from '../../contexts/UserContext';
 import { getOrCreateDeviceId } from '../../utils/deviceFingerprint';
-import { useDeviceFingerprint } from '../../hooks';
 
 const Chat = () => {
   const [chats, setChats] = useState<ChatSession[]>([
@@ -29,15 +28,12 @@ const Chat = () => {
   const [cartState, setCartState] = useState({ itemCount: 0, total: 0 });
 
   const hasInitialized = useRef(false);
+  const currentStreamIdRef = useRef<string | null>(null);
   const { user, isLoading: userLoading } = useUser();
-  const { deviceId, isLoading: deviceLoading } = useDeviceFingerprint();
   
-  console.log('🔥 User data:', user);
-  console.log('🔍 Device ID:', deviceId, 'Loading:', deviceLoading);
 
   // Helper function to transform raw products to Product format
   const transformRawProduct = useCallback((rawProduct: RawProduct): Product => {
-    console.log('🔄 Transforming raw product:', rawProduct);
 
     try {
       // Handle inconsistent API structure - some products have different field names
@@ -70,7 +66,6 @@ const Chat = () => {
           .filter((url: string) => url && url.trim() !== '');
       }
 
-      console.log('🖼️ Product images for', rawProduct.name, ':', productImages);
 
       // Handle category - it can be a string or an object with {id, name, description, parent_id, level}
       let categoryString = 'Uncategorized';
@@ -105,7 +100,6 @@ const Chat = () => {
         images: productImages,
       };
 
-      console.log('✅ Transformed product:', transformed);
       return transformed;
     } catch (error) {
       console.error('❌ Error transforming product:', error, rawProduct);
@@ -256,23 +250,21 @@ const Chat = () => {
     return messages;
   };
 
-  // Helper function to remove all thinking and tool executing messages
+  // Helper function to remove thinking and tool executing messages from current stream
   const removeThinkingMessages = useCallback(() => {
     setChats((prev) =>
       prev.map((c) => {
         if (c.id !== activeChatId) return c;
 
-        // Filter out ALL thinking and tool executing messages
+        // Filter out thinking and tool executing messages from current stream only
         const messagesWithoutThinking = c.messages.filter(
-          (m) => m.type !== 'bot_thinking' && m.type !== 'bot_tool_executing',
+          (m) => {
+            const isThinkingOrTool = m.type === 'bot_thinking' || m.type === 'bot_tool_executing';
+            const isCurrentStream = m.streamId === currentStreamIdRef.current;
+            return !(isThinkingOrTool && isCurrentStream);
+          }
         );
 
-        console.log(
-          '🗑️ Removing thinking/tool messages, before:',
-          c.messages.length,
-          'after:',
-          messagesWithoutThinking.length,
-        );
 
         return {
           ...c,
@@ -289,20 +281,22 @@ const Chat = () => {
         setSessionId(session_id);
       }
 
-      console.log('💭 Thinking message:', message);
 
       const thinkingMsg: ChatMessage = {
         id: `thinking${Date.now()}`,
         type: 'bot_thinking',
         content: message,
+        streamId: currentStreamIdRef.current || undefined,
       };
 
       setChats((prev) =>
         prev.map((c) => {
           if (c.id !== activeChatId) return c;
 
-          // Remove any existing thinking messages (but keep tool executing) and add new one
-          const messagesWithoutThinking = c.messages.filter((m) => m.type !== 'bot_thinking');
+          // Remove any existing thinking messages from current stream and add new one
+          const messagesWithoutThinking = c.messages.filter(
+            (m) => !(m.type === 'bot_thinking' && m.streamId === currentStreamIdRef.current)
+          );
 
           return {
             ...c,
@@ -321,21 +315,23 @@ const Chat = () => {
         setSessionId(session_id);
       }
 
-      console.log('🔧 Tool execution message:', tool, status);
 
       const toolMsg: ChatMessage = {
         id: `tool${Date.now()}`,
         type: 'bot_tool_executing',
         tool: tool,
         status: status,
+        streamId: currentStreamIdRef.current || undefined,
       };
 
       setChats((prev) =>
         prev.map((c) => {
           if (c.id !== activeChatId) return c;
 
-          // Remove any existing tool executing messages and add new one
-          const messagesWithoutToolExec = c.messages.filter((m) => m.type !== 'bot_tool_executing');
+          // Remove any existing tool executing messages from current stream and add new one
+          const messagesWithoutToolExec = c.messages.filter(
+            (m) => !(m.type === 'bot_tool_executing' && m.streamId === currentStreamIdRef.current)
+          );
 
           return {
             ...c,
@@ -360,13 +356,16 @@ const Chat = () => {
         type: 'bot_conversation_chunk',
         content: chunk.message,
         stage: (chunk as any).stage,
+        streamId: currentStreamIdRef.current || undefined,
       };
 
       setChats((prev) =>
         prev.map((c) => {
           if (c.id !== activeChatId) return c;
-          // Keep existing conversation chunks minimal: replace any existing chunk
-          const withoutOldChunks = c.messages.filter((m) => m.type !== 'bot_conversation_chunk');
+          // Keep existing conversation chunks minimal: replace any existing chunk from current stream
+          const withoutOldChunks = c.messages.filter(
+            (m) => !(m.type === 'bot_conversation_chunk' && m.streamId === currentStreamIdRef.current)
+          );
           return { ...c, messages: [...withoutOldChunks, chunkMsg] };
         }),
       );
@@ -376,7 +375,6 @@ const Chat = () => {
 
   const handleResponse = useCallback(
     (response: StreamingResponse & { type: 'response' }) => {
-      console.log('🎯 handleResponse called with:', response);
       // Don't set isLoading to false here - wait for stream complete
 
       // Update session ID if provided
@@ -389,14 +387,12 @@ const Chat = () => {
         response.content?.includes('initialized a new shopping session') ||
         response.content?.includes('Session Ready')
       ) {
-        console.log('⏭️ Skipping initialization message, removing thinking messages');
         removeThinkingMessages();
         return;
       }
 
       // Check if this is a payment initialization message
       if (response.content?.includes('Your order has been initialized')) {
-        console.log('💳 Payment initialization detected');
 
         // Extract amount from the response content
         const amountMatch = response.content.match(/₹(\d+\.?\d*)/);
@@ -419,9 +415,13 @@ const Chat = () => {
           prev.map((c) => {
             if (c.id !== activeChatId) return c;
 
-            // Filter out thinking messages and add response + payment
+            // Filter out thinking/tool messages from current stream and add response + payment
             const messagesWithoutThinking = c.messages.filter(
-              (m) => m.type !== 'bot_thinking' && m.type !== 'bot_tool_executing',
+              (m) => {
+                const isThinkingOrTool = m.type === 'bot_thinking' || m.type === 'bot_tool_executing';
+                const isCurrentStream = m.streamId === currentStreamIdRef.current;
+                return !(isThinkingOrTool && isCurrentStream);
+              }
             );
 
             return {
@@ -461,27 +461,24 @@ const Chat = () => {
 
       // Create messages based on response
       const newMessages = createMessagesFromResponse(responseData);
-      console.log('📝 New messages created:', newMessages.length, newMessages);
 
-      // Remove ALL thinking messages and add response messages
+      // Remove thinking/tool/chunk messages from current stream and add response messages
       setChats((prev) =>
         prev.map((c) => {
           if (c.id !== activeChatId) return c;
 
-          // Filter out ALL thinking and tool executing messages
+          // Filter out thinking, tool executing, and conversation chunk messages from current stream
           const messagesWithoutThinking = c.messages.filter(
-            (m) =>
-              m.type !== 'bot_thinking' &&
-              m.type !== 'bot_tool_executing' &&
-              m.type !== 'bot_conversation_chunk',
+            (m) => {
+              const isTemporary = 
+                m.type === 'bot_thinking' ||
+                m.type === 'bot_tool_executing' ||
+                m.type === 'bot_conversation_chunk';
+              const isCurrentStream = m.streamId === currentStreamIdRef.current;
+              return !(isTemporary && isCurrentStream);
+            }
           );
 
-          console.log(
-            '🗑️ Removing thinking messages in handleResponse, before:',
-            c.messages.length,
-            'after:',
-            messagesWithoutThinking.length,
-          );
 
           return {
             ...c,
@@ -490,18 +487,13 @@ const Chat = () => {
         }),
       );
 
-      console.log('✅ Response handled, thinking messages removed');
     },
     [activeChatId, sessionId, removeThinkingMessages],
   );
 
   const handleRawProducts = useCallback(
     (response: StreamingResponse & { type: 'raw_products' }) => {
-      console.log('🛍️ handleRawProducts called with:', response);
-      console.log('🛍️ Number of raw products:', response.products?.length);
-      console.log('🛍️ Active chat ID:', activeChatId);
       // Don't set isLoading to false here - wait for stream complete
-
       // Update session ID if provided
       if (response.session_id) {
         setSessionId(response.session_id);
@@ -518,45 +510,46 @@ const Chat = () => {
       // const filteredProducts = [response.products[0]];
       const transformedProducts: Product[] = response.products.map(transformRawProduct);
       // const transformedProducts: Product[] = filteredProducts.map(transformRawProduct);
-      console.log('📦 Transformed products:', transformedProducts.length, transformedProducts);
 
-      // Create product list message
+      // Create product list message with stream ID
       const productMessage: ChatMessage = {
         id: `raw_products${Date.now()}`,
         type: 'bot_product_list',
         products: transformedProducts,
+        streamId: currentStreamIdRef.current || undefined,
       };
-      console.log('📝 Created product message:', productMessage);
 
-      // Remove ALL thinking, tool executing, and previous product list messages
+      // Remove thinking, tool executing, conversation chunks from current stream
+      // AND ONLY product lists from the CURRENT stream (keep product lists from other streams)
       setChats((prev) => {
-        console.log('🔄 Updating chats state, current chats:', prev.length);
         return prev.map((c) => {
           if (c.id !== activeChatId) {
-            console.log('⏭️ Skipping chat:', c.id);
             return c;
           }
 
-          console.log('🎯 Updating active chat:', c.id, 'Current messages:', c.messages.length);
 
-          // Filter out thinking, tool executing, conversation chunks, and existing product lists
+          // Filter out:
+          // 1. thinking/tool/chunk messages from current stream (they're temporary)
+          // 2. ONLY bot_product_list messages from the CURRENT stream (replace within stream)
+          // 3. Keep bot_product_list messages from OTHER streams (persist across API calls)
           const messagesWithoutDuplicates = c.messages.filter(
-            (m) =>
-              m.type !== 'bot_thinking' &&
-              m.type !== 'bot_tool_executing' &&
-              m.type !== 'bot_conversation_chunk' &&
-              m.type !== 'bot_product_list',
+            (m) => {
+              const isCurrentStreamTemporary = 
+                (m.type === 'bot_thinking' || 
+                 m.type === 'bot_tool_executing' || 
+                 m.type === 'bot_conversation_chunk') &&
+                m.streamId === currentStreamIdRef.current;
+              
+              const isCurrentStreamProductList = 
+                m.type === 'bot_product_list' && 
+                m.streamId === currentStreamIdRef.current;
+              
+              return !isCurrentStreamTemporary && !isCurrentStreamProductList;
+            }
           );
 
-          console.log(
-            '🗑️ Removing duplicate messages in handleRawProducts, before:',
-            c.messages.length,
-            'after:',
-            messagesWithoutDuplicates.length,
-          );
 
           const newMessages = [...messagesWithoutDuplicates, productMessage];
-          console.log('✨ New messages array length:', newMessages.length);
 
           return {
               ...c,
@@ -565,14 +558,12 @@ const Chat = () => {
         });
       });
 
-      console.log('✅ Raw products handled, duplicate messages removed');
     },
     [activeChatId, transformRawProduct, removeThinkingMessages],
   );
 
   const handleRawCart = useCallback(
     (response: StreamingResponse & { type: 'raw_cart' }) => {
-      console.log('🛒 handleRawCart called with:', response);
 
       // Update session ID if provided
       if (response.session_id) {
@@ -643,7 +634,6 @@ const Chat = () => {
       // If still no items and nothing to show, just clean up and exit
       const hasItemsNow = Array.isArray(normalizedCartSummary?.items) && normalizedCartSummary.items.length > 0;
       if (!hasItemsNow) {
-        console.log('⚠️ Skipping raw_cart with empty items after normalization');
         removeThinkingMessages();
         // Don't set isLoading to false here - wait for stream complete
         return;
@@ -653,7 +643,6 @@ const Chat = () => {
 
       // Transform raw cart summary to CartContext format
       const cartContext = transformRawCartSummary(normalizedCartSummary);
-      console.log('🛒 Transformed cart context:', cartContext);
 
       // Update cart state in header
       setCartState({
@@ -661,33 +650,41 @@ const Chat = () => {
         total: cartContext.total_value || 0,
       });
 
-      // Create cart view message
+      // Create cart view message with stream ID
       const cartMessage: ChatMessage = {
         id: `raw_cart${Date.now()}`,
         type: 'bot_cart_view',
         cartContext: cartContext,
+        streamId: currentStreamIdRef.current || undefined,
       };
 
-      // Remove ALL thinking, tool executing, conversation chunks, and previous cart view messages
+      // Remove thinking/tool/chunk messages from current stream
+      // AND ONLY cart views from the CURRENT stream (keep cart views from other streams)
       setChats((prev) =>
         prev.map((c) => {
           if (c.id !== activeChatId) return c;
 
-          // Filter out thinking, tool executing, conversation chunks, and existing cart views
+          // Filter out:
+          // 1. thinking/tool/chunk messages from current stream (they're temporary)
+          // 2. ONLY bot_cart_view messages from the CURRENT stream (replace within stream)
+          // 3. Keep bot_cart_view messages from OTHER streams (persist across API calls)
           const messagesWithoutDuplicates = c.messages.filter(
-            (m) =>
-              m.type !== 'bot_thinking' &&
-              m.type !== 'bot_tool_executing' &&
-              m.type !== 'bot_conversation_chunk' &&
-              m.type !== 'bot_cart_view',
+            (m) => {
+              const isCurrentStreamTemporary = 
+                (m.type === 'bot_thinking' || 
+                 m.type === 'bot_tool_executing' || 
+                 m.type === 'bot_conversation_chunk') &&
+                m.streamId === currentStreamIdRef.current;
+              
+              const isCurrentStreamCartView = 
+                m.type === 'bot_cart_view' && 
+                m.streamId === currentStreamIdRef.current;
+              
+              return !isCurrentStreamTemporary && !isCurrentStreamCartView;
+            }
           );
 
-          console.log(
-            '🗑️ Removing duplicate messages in handleRawCart, before:',
-            c.messages.length,
-            'after:',
-            messagesWithoutDuplicates.length,
-          );
+     
 
           return {
             ...c,
@@ -696,7 +693,6 @@ const Chat = () => {
         }),
       );
 
-      console.log('✅ Raw cart handled, duplicate messages removed');
     },
     [activeChatId, transformRawCartSummary, removeThinkingMessages],
   );
@@ -737,7 +733,6 @@ const Chat = () => {
   );
 
   const handleStreamComplete = useCallback(() => {
-    console.log('🏁 handleStreamComplete called - removing ALL thinking messages');
     setIsLoading(false);
 
     // Always remove all thinking messages when stream completes
@@ -763,6 +758,10 @@ const Chat = () => {
 
   const sendMessage = useCallback(
     (msg: string, appendMessage = true) => {
+      // Generate a unique stream ID for this API call
+      const newStreamId = `stream_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      currentStreamIdRef.current = newStreamId;
+      
       // Add user message immediately
       if (appendMessage) {
         const newMsg: ChatMessage = { id: `m${Date.now()}`, type: 'user', content: msg };
@@ -820,7 +819,6 @@ const Chat = () => {
           const deviceId = await getOrCreateDeviceId();
 
           const initMessage = `initialize_shopping (userId: ${user.uid}, deviceid: ${deviceId})`;
-          console.log('🚀 Initializing shopping session with:', initMessage);
           
           sendMessage(initMessage, false);
         } catch (error) {
@@ -833,7 +831,6 @@ const Chat = () => {
           }
 
           const initMessage = `initialize_shopping (userId: ${user.uid}, deviceid: ${fallbackDeviceId})`;
-          console.log('🚀 Initializing shopping session with fallback:', initMessage);
           
           sendMessage(initMessage, false);
         }

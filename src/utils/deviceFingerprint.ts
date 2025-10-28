@@ -15,7 +15,6 @@ export const generateUniqueBrowserId = async (): Promise<string> => {
     // Store the visitorId in local storage as deviceId
     localStorage.setItem('deviceId', result.visitorId);
     
-    console.log('🔍 Generated device fingerprint:', result.visitorId);
     return result.visitorId;
   } catch (error) {
     console.error('❌ Error generating browser fingerprint:', error);
@@ -23,8 +22,6 @@ export const generateUniqueBrowserId = async (): Promise<string> => {
     // Fallback to a generated ID if fingerprinting fails
     const fallbackId = `device_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     localStorage.setItem('deviceId', fallbackId);
-    
-    console.log('🔄 Using fallback device ID:', fallbackId);
     return fallbackId;
   }
 };
@@ -38,7 +35,6 @@ export const getOrCreateDeviceId = async (): Promise<string> => {
     const storedDeviceId = localStorage.getItem('deviceId');
     
     if (storedDeviceId) {
-      console.log('📱 Using stored device ID:', storedDeviceId);
       return storedDeviceId;
     }
     

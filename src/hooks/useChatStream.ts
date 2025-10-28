@@ -37,7 +37,7 @@ export const useChatStream = ({
       isStreamingRef.current = true;
 
       try {
-        const response = await fetch('http://localhost:8001/api/v1/chat/stream', {
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/chat/stream`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -101,23 +101,18 @@ export const useChatStream = ({
               try {
                 const data = JSON.parse(jsonStr) as StreamingResponse;
 
-                console.log('📡 SSE Data received:', data);
 
                 if (data.type === 'thinking') {
                   onThinking?.(data.message, data.session_id);
                 } else if (data.type === 'conversation_chunk') {
                   onConversationChunk?.(data as StreamingResponse & { type: 'conversation_chunk' });
                 } else if (data.type === 'tool_start') {
-                  console.log('🔧 Tool execution started:', data.tool);
                   onToolStart?.(data.tool, data.status, data.session_id);
                 } else if (data.type === 'response') {
-                  console.log('✅ Response received, calling onResponse');
                   onResponse?.(data);
                 } else if (data.type === 'raw_products') {
-                  console.log('🛍️ Raw products received, calling onRawProducts');
                   onRawProducts?.(data);
                 } else if (data.type === 'raw_cart') {
-                  console.log('🛒 Raw cart received, calling onRawCart');
                   onRawCart?.(data);
                 }
               } catch (parseError) {
@@ -129,7 +124,6 @@ export const useChatStream = ({
       } catch (error: unknown) {
         if (error instanceof Error) {
           if (error.name === 'AbortError') {
-            console.log('Stream aborted');
             return;
           }
           onError?.(error);

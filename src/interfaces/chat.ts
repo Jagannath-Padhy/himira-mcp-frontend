@@ -188,22 +188,23 @@ export type FullData = {
 
 // Enhanced Chat Message Types
 export type ChatMessage =
-  | { id: string; type: 'user' | 'bot'; content: string }
-  | { id: string; type: 'bot_thinking'; content: string }
-  | { id: string; type: 'bot_tool_executing'; tool: string; status: string }
-  | { id: string; type: 'bot_conversation_chunk'; content: string; stage?: string }
-  | { id: string; type: 'bot_product_list'; products: Product[] }
-  | { id: string; type: 'bot_cart_view'; cartContext: CartContext }
-  | { id: string; type: 'bot_checkout_stage'; quoteData: QuoteData; journeyContext: JourneyContext }
-  | { id: string; type: 'bot_error'; error: ErrorData }
-  | { id: string; type: 'bot_order_confirmation'; orderData: OrderData }
-  | { id: string; type: 'bot_success'; message: string; nextOperations?: string[] }
+  | { id: string; type: 'user' | 'bot'; content: string; streamId?: string }
+  | { id: string; type: 'bot_thinking'; content: string; streamId?: string }
+  | { id: string; type: 'bot_tool_executing'; tool: string; status: string; streamId?: string }
+  | { id: string; type: 'bot_conversation_chunk'; content: string; stage?: string; streamId?: string }
+  | { id: string; type: 'bot_product_list'; products: Product[]; streamId?: string }
+  | { id: string; type: 'bot_cart_view'; cartContext: CartContext; streamId?: string }
+  | { id: string; type: 'bot_checkout_stage'; quoteData: QuoteData; journeyContext: JourneyContext; streamId?: string }
+  | { id: string; type: 'bot_error'; error: ErrorData; streamId?: string }
+  | { id: string; type: 'bot_order_confirmation'; orderData: OrderData; streamId?: string }
+  | { id: string; type: 'bot_success'; message: string; nextOperations?: string[]; streamId?: string }
   | {
       id: string;
       type: 'bot_payment_initiated';
       orderId: string;
       amount: number;
       currency: string;
+      streamId?: string;
     };
 
 export type ErrorData = {

@@ -99,7 +99,6 @@ const RazorpayPayment = ({
           },
         },
         handler: (response: any) => {
-          console.log('Payment successful:', response);
           if (response?.razorpay_payment_id) {
             onPaymentSuccess(response.razorpay_payment_id);
           } else {

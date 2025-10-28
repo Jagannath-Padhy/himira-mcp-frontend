@@ -55,12 +55,6 @@ const ChatArea = ({ messages, onSend, isLoading = false }: ChatAreaProps) => {
   // Export logic moved into PdfExportButton as a reusable component
 
   const renderMessage = (m: ChatMessage) => {
-    console.log('🎨 Rendering message:', {
-      message: m,
-      // id: m.id,
-      // type: m.type,
-      // has_cartContext: m.type === 'bot_cart_view' ? !!(m as any).cartContext : 'N/A',
-    });
 
     // User and bot text messages
     if (m.type === 'user' || m.type === 'bot') {
@@ -159,7 +153,6 @@ const ChatArea = ({ messages, onSend, isLoading = false }: ChatAreaProps) => {
 
     // Product list display
     if (m.type === 'bot_product_list') {
-      console.log('📦 Rendering product list with', m.products.length, 'products');
       return (
         <Box key={m.id} sx={{ mb: 2 }}>
           <Typography variant="h6" gutterBottom color="primary">
@@ -187,7 +180,6 @@ const ChatArea = ({ messages, onSend, isLoading = false }: ChatAreaProps) => {
 
     // Cart view
     if (m.type === 'bot_cart_view') {
-      console.log('🛒 Rendering CartInterface with context:', m.cartContext);
       return <CartInterface key={m.id} cartContext={m.cartContext} onSend={onSend} />;
     }
 
@@ -227,7 +219,6 @@ const ChatArea = ({ messages, onSend, isLoading = false }: ChatAreaProps) => {
 
     // Payment initiated message
     if (m.type === 'bot_payment_initiated') {
-      console.log('💳 Payment initiated message:', m);
       return (
         <PaymentWrapper
           key={m.id}
@@ -235,7 +226,6 @@ const ChatArea = ({ messages, onSend, isLoading = false }: ChatAreaProps) => {
           amount={m.amount}
           currency={m.currency}
           onPaymentSuccess={(paymentId) => {
-            console.log('✅ Payment successful:', paymentId);
             onSend(`Payment completed successfully. Payment ID: ${paymentId}`);
           }}
           onPaymentError={(error) => {
@@ -243,7 +233,6 @@ const ChatArea = ({ messages, onSend, isLoading = false }: ChatAreaProps) => {
             onSend(`Payment failed: ${error}`);
           }}
           onPaymentCancel={() => {
-            console.log('🚫 Payment cancelled');
             onSend('Payment was cancelled');
           }}
         />

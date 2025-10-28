@@ -17,7 +17,6 @@ type MessageBubbleProps = {
 
 export default function MessageBubble({ type, content, animated = false }: MessageBubbleProps) {
   const isUser = type === 'user';
-  console.log('🎨 Rendering MessageBubble:', isUser);
   const theme = useTheme();
 
   const AnimatedWaveText = ({ text }: { text: string }) => (

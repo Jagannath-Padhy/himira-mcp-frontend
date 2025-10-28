@@ -1,7 +1,7 @@
 import axios from 'axios';
 // import { APIRoute } from 'enums/api'
 
-const instance = axios.create({ baseURL: 'http://localhost:8001/api/v1' });
+const instance = axios.create({ baseURL: import.meta.env.VITE_API_BASE_URL });
 
 // const getStoredAuthToken = (): string | null => localStorage.getItem('authToken')
 // const storeAuthToken = (token: string): void => localStorage.setItem('authToken', token)

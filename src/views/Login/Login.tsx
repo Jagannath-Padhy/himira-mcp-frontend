@@ -9,13 +9,13 @@ import {
   Alert, 
   IconButton, 
   InputAdornment,
-  Divider,
+  // Divider,
   CircularProgress,
   Fade,
 } from '@mui/material';
 import { 
-  Visibility, 
-  VisibilityOff, 
+  // Visibility, 
+  // VisibilityOff, 
   Phone, 
   Google,
   ArrowBack,
@@ -30,12 +30,13 @@ type LoginStep = 'method' | 'phone' | 'otp' | 'email';
 
 export default function Login() {
   const [currentStep, setCurrentStep] = useState<LoginStep>('method');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  // Email Login => NOT USED FOR NOW 
+  // const [email, setEmail] = useState('');
+  // const [password, setPassword] = useState('');
+  // const [showPassword, setShowPassword] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState('7351477479');
   const [otp, setOtp] = useState('');
   const [error, setError] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [otpTimer, setOtpTimer] = useState(0);
   const [confirmationResult, setConfirmationResult] = useState<any>(null);
   
@@ -62,32 +63,33 @@ export default function Login() {
     return () => clearInterval(timer);
   }, [otpTimer]);
 
-  const handleTogglePasswordVisibility = () => {
-    setShowPassword(!showPassword);
-  };
+  // Email Login => NOT USED FOR NOW 
 
-  const handleEmailLogin = () => {
-    // Clear previous error
-    setError('');
+  // const handleTogglePasswordVisibility = () => {
+  //   setShowPassword(!showPassword);
+  // };
+
+  // const handleEmailLogin = () => {
+  //   // Clear previous error
+  //   setError('');
     
-    // Static credentials
-    const validEmail = 'ashish.jain@ondc.org';
-    const validPassword = '12345';
+  //   // Static credentials
+  //   const validEmail = 'ashish.jain@ondc.org';
+  //   const validPassword = '12345';
     
-    if (email === validEmail && password === validPassword) {
-      // Use the auth.ts login function
-      login();
-      navigate('/');
-    } else {
-      setError('Invalid email or password. Please try again.');
-    }
-  };
+  //   if (email === validEmail && password === validPassword) {
+  //     // Use the auth.ts login function
+  //     login();
+  //     navigate('/');
+  //   } else {
+  //     setError('Invalid email or password. Please try again.');
+  //   }
+  // };
 
   const handleGoogleLogin = async () => {
     try {
       clearError();
       const user = await signInWithGoogle();
-      console.log('Google login successful:', user);
       
       // Store user data in context and localStorage
       updateUserFromFirebase(user);
@@ -127,7 +129,6 @@ export default function Login() {
     try {
       clearError();
       const user = await verifyOTP(confirmationResult, otp);
-      console.log('Phone login successful:', user);
       
       // Store user data in context and localStorage
       updateUserFromFirebase(user);
@@ -349,6 +350,8 @@ export default function Login() {
       </Box>
     </Stack>
   );
+
+  // Email Login => NOT USED FOR NOW 
 
   // const renderEmailLogin = () => (
   //   <Stack spacing={2}>
